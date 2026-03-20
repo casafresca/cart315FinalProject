@@ -5,27 +5,31 @@ using UnityEngine.AI;
 public class NPC : Interactable
 {
     [SerializeField] private TextAsset inkJSON;
-
     private NavMeshAgent agent;
     private Transform playerTransform;
-    private Rigidbody rb; // Stored reference to the Rigidbody
+    private Rigidbody rb;
+
     public bool isFollowing = false;
+    public bool isCombatActive = false;
+
+    [Header("Combat & Health")]
+    public float maxHealth = 100f;
+    public float currentHealth;
+    public GameObject npcGun;
 
     [Header("Movement Settings")]
     [SerializeField] private float stoppingDistance = 2.5f;
 
     void Start()
     {
-        agent = GetComponent<NavMeshAgent>();
+        currentHealth = maxHealth;
+        if (npcGun != null) npcGun.SetActive(false);
 
-        // --- FIX 1: Assign the Rigidbody here ---
+        agent = GetComponent<NavMeshAgent>();
         rb = GetComponent<Rigidbody>();
 
         GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
-        {
-            playerTransform = player.transform;
-        }
+        if (player != null) playerTransform = player.transform;
 
         if (agent != null)
         {
@@ -36,77 +40,79 @@ public class NPC : Interactable
 
     void Update()
     {
-        if (isFollowing && agent != null && agent.enabled)
+        // TRACKING: Face the player during combat
+        if (isCombatActive && playerTransform != null)
         {
-            // --- FIX 2: Emergency Hard Lock with Null Check ---
-            // 0.16f is your floor's Y position from your inspector images
-            if (transform.position.y < 0.15f)
+            Vector3 direction = (playerTransform.position - transform.position).normalized;
+            direction.y = 0;
+            if (direction != Vector3.zero)
             {
-                Vector3 fixedPos = transform.position;
-                fixedPos.y = 0.16f;
-                transform.position = fixedPos;
-
-                // Only try to use rb if it actually exists
-                if (rb != null)
-                {
-                    rb.linearVelocity = Vector3.zero;
-                }
-            }
-
-            if (playerTransform != null)
-            {
-                agent.SetDestination(playerTransform.position);
-
-                if (Vector3.Distance(transform.position, playerTransform.position) < stoppingDistance)
-                {
-                    agent.isStopped = true;
-                }
-                else
-                {
-                    agent.isStopped = false;
-                }
+                Quaternion targetRot = Quaternion.LookRotation(direction);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 5f);
             }
         }
+
+        if (isFollowing && agent != null && agent.enabled)
+        {
+            HandleFollowingLogic();
+        }
+    }
+
+    public void TakeDamage(float amount)
+    {
+        currentHealth -= amount;
+        if (isCombatActive && (currentHealth / maxHealth) <= 0.3f)
+        {
+            isCombatActive = false;
+            if (npcGun != null) npcGun.SetActive(false);
+        }
+    }
+
+    public void ResumeCombat()
+    {
+        isCombatActive = true;
+        currentHealth = maxHealth;
+        if (npcGun != null) npcGun.SetActive(true);
     }
 
     public void StartFollowing()
     {
         isFollowing = true;
-
-        if (rb != null)
-        {
-            rb.isKinematic = true;
-            rb.useGravity = false;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            Debug.Log("Rigidbody stabilized and momentum zeroed.");
-        }
-
-        if (agent != null)
-        {
-            agent.enabled = true;
-
-            NavMeshHit hit;
-            if (NavMesh.SamplePosition(transform.position, out hit, 5.0f, NavMesh.AllAreas))
-            {
-                agent.Warp(hit.position);
-                Debug.Log($"NPC safely grounded on NavMesh at: {hit.position}");
-            }
-            else
-            {
-                agent.Warp(transform.position);
-                Debug.LogWarning("SamplePosition failed, using standard Warp.");
-            }
-
-            agent.isStopped = false;
-        }
-        Debug.Log("Recruitment successful! NPC is following.");
+        isCombatActive = false;
+        if (npcGun != null) npcGun.SetActive(false);
+        if (agent != null) agent.enabled = true;
+        if (rb != null) rb.isKinematic = true;
     }
 
     protected override void Interact()
     {
         if (isFollowing) return;
-        base.Interact();
-        DialogueManager.GetInstance().EnterDialogueMode(inkJSON, this);
+
+        if ((currentHealth / maxHealth) <= 0.3f)
+        {
+            DialogueManager.GetInstance().EnterDialogueMode(inkJSON, this);
+        }
+        else if (!isCombatActive)
+        {
+            isCombatActive = true;
+            if (npcGun != null) npcGun.SetActive(true);
+        }
+    }
+
+    private void HandleFollowingLogic()
+    {
+        // Your existing Y-axis floor fix
+        if (transform.position.y < 0.15f)
+        {
+            Vector3 fixedPos = transform.position;
+            fixedPos.y = 0.16f;
+            transform.position = fixedPos;
+        }
+
+        if (playerTransform != null)
+        {
+            agent.SetDestination(playerTransform.position);
+            agent.isStopped = Vector3.Distance(transform.position, playerTransform.position) < stoppingDistance;
+        }
     }
 }

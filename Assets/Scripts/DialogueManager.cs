@@ -26,19 +26,28 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private AudioClip failureSound;
 
     private Story currentStory;
+
+    // This is the variable your Weapon script checks
     public bool dialogueIsPlaying { get; private set; }
 
     private static DialogueManager instance;
 
     private void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
         instance = this;
+
+        // --- CRITICAL FIX: Ensure this is false when the game starts ---
+        dialogueIsPlaying = false;
         dialoguePanel.SetActive(false);
     }
 
     public static DialogueManager GetInstance() => instance;
 
-    
     public void EnterDialogueMode(TextAsset inkJSON, NPC npc)
     {
         currentNPC = npc;
@@ -46,10 +55,11 @@ public class DialogueManager : MonoBehaviour
         dialogueRounds = 0;
 
         GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null) player.GetComponent<PlayerUI>().UpdateText(string.Empty);
+        if (player != null && player.GetComponent<PlayerUI>() != null)
+            player.GetComponent<PlayerUI>().UpdateText(string.Empty);
 
         currentStory = new Story(inkJSON.text);
-        dialogueIsPlaying = true;
+        dialogueIsPlaying = true; // Block shooting now
         dialoguePanel.SetActive(true);
         continueButton.SetActive(false);
 
@@ -61,7 +71,14 @@ public class DialogueManager : MonoBehaviour
 
     public void OnContinuePressed()
     {
-        ContinueStory();
+        if (currentStory.canContinue)
+        {
+            ContinueStory();
+        }
+        else
+        {
+            ExitDialogueMode();
+        }
     }
 
     private void ContinueStory()
@@ -71,13 +88,11 @@ public class DialogueManager : MonoBehaviour
             dialogueText.text = currentStory.Continue();
             DisplayChoices();
 
-            // RANDOMIZATION LOGIC:
-            // Every time new choices appear, pick one randomly to be the "correct" one.
             if (currentStory.currentChoices.Count > 0)
             {
                 int randomIndex = Random.Range(0, currentStory.currentChoices.Count);
                 pointWinningText = currentStory.currentChoices[randomIndex].text;
-                Debug.Log("Round " + (dialogueRounds + 1) + " correct choice is: " + pointWinningText);
+                Debug.Log($"Round {dialogueRounds + 1} correct choice: {pointWinningText}");
             }
         }
         else if (currentStory.currentChoices.Count == 0)
@@ -89,15 +104,12 @@ public class DialogueManager : MonoBehaviour
     private void DisplayChoices()
     {
         List<Choice> currentChoices = currentStory.currentChoices;
-
-        // Only show the continue button if there are NO choices left
         continueButton.SetActive(currentChoices.Count == 0);
 
         for (int i = 0; i < choices.Length; i++)
         {
             if (i < currentChoices.Count)
             {
-                // THIS LINE IS KEY: It brings the buttons back for Round 2 and 3
                 choices[i].gameObject.SetActive(true);
                 choices[i].GetComponentInChildren<TextMeshProUGUI>().text = currentChoices[i].text;
             }
@@ -110,7 +122,6 @@ public class DialogueManager : MonoBehaviour
 
     public void MakeChoice(int choiceIndex)
     {
-        // 1. Check if the text matches the randomized winner
         if (currentStory.currentChoices[choiceIndex].text == pointWinningText)
         {
             npcPoints++;
@@ -119,74 +130,57 @@ public class DialogueManager : MonoBehaviour
         currentStory.ChooseChoiceIndex(choiceIndex);
         dialogueRounds++;
 
-        // 2. Hide buttons immediately so they can be refreshed for the next round
         foreach (GameObject choiceButton in choices)
         {
             choiceButton.SetActive(false);
         }
 
-        // 3. If we haven't finished 3 rounds, go back to ContinueStory
         if (dialogueRounds < 3)
         {
-            // This picks a NEW winning text and brings the 4 buttons back
             ContinueStory();
         }
         else
         {
-            // 4. Show final text and evaluate recruitment
             if (currentStory.canContinue)
             {
                 dialogueText.text = currentStory.Continue();
             }
 
-            // Only show the bottom Continue button now
             continueButton.SetActive(true);
             CheckNPCFollowStatus();
         }
     }
 
-    private void ExitDialogueMode()
-    {
-        dialogueIsPlaying = false;
-        dialoguePanel.SetActive(false);
-
-        // If recruitment failed, reset everything for the next E press
-        if (npcPoints < 3)
-        {
-            npcPoints = 0;
-            dialogueRounds = 0;
-            currentStory = null; // Forces story to start from line 1 next time
-        }
-
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-    }
-
     private void CheckNPCFollowStatus()
     {
+        if (currentNPC == null) return;
+
         if (npcPoints >= 3)
         {
-            Debug.Log("Recruitment Successful!");
-
-            if (audioSource != null && successSound != null)
-            {
-                audioSource.PlayOneShot(successSound);
-            }
-
-            if (currentNPC != null)
-            {
-                currentNPC.StartFollowing();
-            }
+            if (audioSource != null && successSound != null) audioSource.PlayOneShot(successSound);
+            currentNPC.StartFollowing();
         }
         else
         {
-            Debug.Log("Recruitment Failed. Points: " + npcPoints);
-
-            // Play the failure sound if they didn't get enough points
-            if (audioSource != null && failureSound != null)
-            {
-                audioSource.PlayOneShot(failureSound);
-            }
+            if (audioSource != null && failureSound != null) audioSource.PlayOneShot(failureSound);
+            currentNPC.ResumeCombat();
         }
+    }
+
+    private void ExitDialogueMode()
+    {
+        // --- RESET EVERYTHING FOR GAMEPLAY ---
+        dialogueIsPlaying = false;
+        dialoguePanel.SetActive(false);
+
+        npcPoints = 0;
+        dialogueRounds = 0;
+        currentStory = null;
+        currentNPC = null;
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        Debug.Log("Dialogue Mode Exited. Shooting should be re-enabled.");
     }
 }
