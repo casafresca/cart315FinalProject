@@ -36,7 +36,7 @@ public class TherapyRoomTrigger : MonoBehaviour
             return;
         }
 
-        if (other.CompareTag("NPC"))
+        if (other.CompareTag("Target"))
         {
             npcCountInRoom++;
             RefreshPanel();
