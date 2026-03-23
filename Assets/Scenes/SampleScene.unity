@@ -541,6 +541,14 @@ PrefabInstance:
       propertyPath: m_Center.y
       value: 0.5559708
       objectReference: {fileID: 0}
+    - target: {fileID: 1869009097383086193, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
+      propertyPath: outcomeText
+      value: 
+      objectReference: {fileID: 1476580111}
+    - target: {fileID: 1869009097383086193, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
+      propertyPath: outcomePanel
+      value: 
+      objectReference: {fileID: 1640364257}
     - target: {fileID: 2430695243588032170, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
       propertyPath: m_LocalScale.x
       value: 2.0813038
@@ -612,10 +620,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 3487176723607691810, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1519031442}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
 --- !u!1 &370859612
 GameObject:
@@ -2948,25 +2953,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
---- !u!1 &1519031436 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 3487176723607691810, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
-  m_PrefabInstance: {fileID: 159585853}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1519031442
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1519031436}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5613e805129400046b01bc14e877a85a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TherapyOutcomePanel
-  outcomePanel: {fileID: 1640364257}
-  outcomeText: {fileID: 1476580111}
 --- !u!1 &1586824024
 GameObject:
   m_ObjectHideFlags: 0
