@@ -126,6 +126,67 @@ public class TherapyRoomController : MonoBehaviour
         Cursor.visible = true;
     }
 
+    public void ShowQuestionOnly()
+    {
+        Debug.Log("TherapyRoomController: ShowQuestionOnly() called.");
+
+        if (questionPanel != null)
+        {
+            Debug.Log("TherapyRoomController: showing question panel only -> " + questionPanel.name);
+            questionPanel.SetActive(true);
+        }
+        else
+        {
+            Debug.LogError("TherapyRoomController: questionPanel is not assigned.");
+        }
+
+        if (questionText != null)
+        {
+            questionText.text = promptQuestion;
+        }
+        else
+        {
+            Debug.LogError("TherapyRoomController: questionText is not assigned.");
+        }
+
+        if (journalUI != null)
+        {
+            journalUI.HideJournal();
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    public void OpenJournalOnly()
+    {
+        if (journalUI != null)
+        {
+            Debug.Log("TherapyRoomController: opening journal only -> " + journalUI.name);
+            journalUI.OpenJournal();
+        }
+        else
+        {
+            Debug.LogError("TherapyRoomController: journalUI is not assigned, so journal cannot open.");
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    public void CloseJournalOnly()
+    {
+        if (journalUI != null)
+        {
+            Debug.Log("TherapyRoomController: closing journal only -> " + journalUI.name);
+            journalUI.HideJournal();
+        }
+        else
+        {
+            Debug.LogWarning("TherapyRoomController: journalUI is not assigned, so there is no journal to close.");
+        }
+    }
+
     public void OnClosePressed()
     {
         if (questionPanel != null)
