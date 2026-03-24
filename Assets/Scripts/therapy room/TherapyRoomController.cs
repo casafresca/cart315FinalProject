@@ -8,7 +8,8 @@ public class TherapyRoomController : MonoBehaviour
     [SerializeField] private GameObject questionPanel;
     [SerializeField] private TextMeshProUGUI questionText;
     [SerializeField] private TextMeshProUGUI timerText;
-    [SerializeField] private string promptQuestion = "Choose the correct therapy answer by standing in zone A, B, C, or D.";
+    [TextArea(3, 8)]
+    [SerializeField] private string promptQuestion = "";
     [SerializeField] private DialogueBox_TR introDialogue;
     [SerializeField] private TherapyJournalUI journalUI;
 
