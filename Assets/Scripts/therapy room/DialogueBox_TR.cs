@@ -3,6 +3,8 @@ using TMPro;
 using System.Collections;
 using System;
 using UnityEngine.UI;
+using System.Collections.Generic;
+using TMPro;
 
 public class DialogueBox_TR : MonoBehaviour
 {
@@ -36,6 +38,7 @@ public class DialogueBox_TR : MonoBehaviour
     [SerializeField] private string[] lines;
     [SerializeField] private float textSpeed = 0.03f;
     [SerializeField] private KeyCode nextKey = KeyCode.N;
+    [SerializeField] private int maxCharactersPerPage = 180;
 
     [Header("Flow")]
     [SerializeField] private TherapyRoomController therapyRoomController;
@@ -49,6 +52,8 @@ public class DialogueBox_TR : MonoBehaviour
     private int currentQuestionIndex;
     private Coroutine typingCoroutine;
     private DialogueState dialogueState = DialogueState.IntroLines;
+    private string[] currentPages = Array.Empty<string>();
+    private int currentPageIndex;
 
     private void Start()
     {
@@ -98,35 +103,37 @@ public class DialogueBox_TR : MonoBehaviour
 
     private void StartTypingCurrentLine()
     {
-        textComponent.text = string.Empty;
-
-        if (typingCoroutine != null)
-        {
-            StopCoroutine(typingCoroutine);
-        }
-
-        typingCoroutine = StartCoroutine(TypeLine());
+        StartPagedText(lines[index]);
     }
 
     private void AdvanceDialogue()
     {
         if (dialogueState == DialogueState.IntroLines)
         {
-            if (textComponent.text == lines[index])
+            if (!IsCurrentPageFullyShown())
             {
-                NextLine();
+                FinishTypingCurrentText(GetCurrentPageText());
+            }
+            else if (HasMorePages())
+            {
+                ShowNextPage();
             }
             else
             {
-                FinishTypingCurrentText(lines[index]);
+                NextLine();
             }
         }
         else if (dialogueState == DialogueState.FollowUpText)
         {
-            DialogueQuestion currentQuestion = questions[currentQuestionIndex];
-            string followUpText = currentQuestion.correctFollowUpText;
-
-            if (textComponent.text == followUpText)
+            if (!IsCurrentPageFullyShown())
+            {
+                FinishTypingCurrentText(GetCurrentPageText());
+            }
+            else if (HasMorePages())
+            {
+                ShowNextPage();
+            }
+            else
             {
                 currentQuestionIndex++;
 
@@ -139,30 +146,37 @@ public class DialogueBox_TR : MonoBehaviour
                     FinishDialogueSequence();
                 }
             }
-            else
-            {
-                FinishTypingCurrentText(followUpText);
-            }
         }
         else if (dialogueState == DialogueState.QuestionTyping)
         {
-            DialogueQuestion currentQuestion = questions[currentQuestionIndex];
-            FinishTypingCurrentText(currentQuestion.questionText);
-            ShowOptionsForCurrentQuestion();
+            if (!IsCurrentPageFullyShown())
+            {
+                FinishTypingCurrentText(GetCurrentPageText());
+            }
+            else if (HasMorePages())
+            {
+                ShowNextPage();
+            }
+            else
+            {
+                ShowOptionsForCurrentQuestion();
+            }
         }
     }
 
-    private IEnumerator TypeLine()
+    private IEnumerator TypeCurrentPage()
     {
-        Debug.Log("Typing line: " + lines[index]);
-        foreach (char c in lines[index].ToCharArray())
+        string pageText = GetCurrentPageText();
+        Debug.Log("DialogueBox_TR: typing page " + (currentPageIndex + 1) + "/" + currentPages.Length);
+
+        foreach (char c in pageText.ToCharArray())
         {
             textComponent.text += c;
             yield return new WaitForSeconds(textSpeed);
         }
 
         typingCoroutine = null;
-        Debug.Log("Finished typing line");
+        Debug.Log("DialogueBox_TR: finished typing page.");
     }
 
     private void NextLine()
@@ -230,26 +244,7 @@ public class DialogueBox_TR : MonoBehaviour
         Cursor.visible = true;
 
         HideQuestionOptions();
-        textComponent.text = string.Empty;
-
-        if (typingCoroutine != null)
-        {
-            StopCoroutine(typingCoroutine);
-        }
-
-        typingCoroutine = StartCoroutine(TypeQuestionText(question.questionText));
-    }
-
-    private IEnumerator TypeQuestionText(string content)
-    {
-        foreach (char c in content.ToCharArray())
-        {
-            textComponent.text += c;
-            yield return new WaitForSeconds(textSpeed);
-        }
-
-        typingCoroutine = null;
-        ShowOptionsForCurrentQuestion();
+        StartPagedText(question.questionText);
     }
 
     private void ShowOptionsForCurrentQuestion()
@@ -315,32 +310,33 @@ public class DialogueBox_TR : MonoBehaviour
         {
             HideQuestionOptions();
             dialogueState = DialogueState.FollowUpText;
-            textComponent.text = string.Empty;
-
-            if (typingCoroutine != null)
-            {
-                StopCoroutine(typingCoroutine);
-            }
-
-            typingCoroutine = StartCoroutine(TypeCustomText(question.correctFollowUpText));
+            StartPagedText(question.correctFollowUpText);
         }
         else
         {
-            textComponent.text = question.wrongAnswerText;
+            StartPagedText(question.wrongAnswerText);
+            dialogueState = DialogueState.QuestionTyping;
             Debug.Log("DialogueBox_TR: wrong option selected. Waiting for another choice.");
         }
     }
 
-    private IEnumerator TypeCustomText(string content)
+    private void StartPagedText(string content)
     {
-        foreach (char c in content.ToCharArray())
+        currentPages = SplitIntoPages(content);
+        currentPageIndex = 0;
+        StartTypingCurrentPage();
+    }
+
+    private void StartTypingCurrentPage()
+    {
+        textComponent.text = string.Empty;
+
+        if (typingCoroutine != null)
         {
-            textComponent.text += c;
-            yield return new WaitForSeconds(textSpeed);
+            StopCoroutine(typingCoroutine);
         }
 
-        typingCoroutine = null;
-        Debug.Log("DialogueBox_TR: follow-up text finished. Press " + nextKey + " to continue.");
+        typingCoroutine = StartCoroutine(TypeCurrentPage());
     }
 
     private void FinishTypingCurrentText(string fullText)
@@ -360,6 +356,179 @@ public class DialogueBox_TR : MonoBehaviour
         {
             questionOptionsPanel.SetActive(false);
         }
+    }
+
+    private bool IsCurrentPageFullyShown()
+    {
+        return textComponent.text == GetCurrentPageText();
+    }
+
+    private bool HasMorePages()
+    {
+        return currentPageIndex < currentPages.Length - 1;
+    }
+
+    private void ShowNextPage()
+    {
+        currentPageIndex++;
+        StartTypingCurrentPage();
+    }
+
+    private string GetCurrentPageText()
+    {
+        if (currentPages == null || currentPages.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return currentPages[Mathf.Clamp(currentPageIndex, 0, currentPages.Length - 1)];
+    }
+
+    private string[] SplitIntoPages(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return new[] { string.Empty };
+        }
+
+        if (textComponent == null)
+        {
+            return SplitIntoPagesByCharacterCount(content);
+        }
+
+        string normalizedContent = content.Replace("\r\n", "\n");
+        List<string> tokens = TokenizeForPaging(normalizedContent);
+        List<string> pages = new List<string>();
+        string currentPage = string.Empty;
+
+        foreach (string token in tokens)
+        {
+            string candidate = currentPage + token;
+
+            if (!string.IsNullOrEmpty(currentPage) && WouldOverflowTextBox(candidate))
+            {
+                pages.Add(currentPage);
+                currentPage = token.TrimStart();
+            }
+            else
+            {
+                currentPage = candidate;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(currentPage))
+        {
+            pages.Add(currentPage);
+        }
+
+        if (pages.Count == 0)
+        {
+            pages.Add(normalizedContent);
+        }
+
+        Debug.Log("DialogueBox_TR: split text into " + pages.Count + " page(s).");
+        return pages.ToArray();
+    }
+
+    private bool WouldOverflowTextBox(string candidateText)
+    {
+        if (maxCharactersPerPage > 0 && candidateText.Length > maxCharactersPerPage * 2)
+        {
+            return true;
+        }
+
+        textComponent.text = candidateText;
+        textComponent.ForceMeshUpdate();
+        TMP_TextInfo textInfo = textComponent.textInfo;
+
+        if (textInfo == null)
+        {
+            return maxCharactersPerPage > 0 && candidateText.Length > maxCharactersPerPage;
+        }
+
+        int visibleLineCount = textInfo.lineCount;
+        float availableHeight = textComponent.rectTransform.rect.height;
+        float preferredHeight = textComponent.preferredHeight;
+
+        bool heightOverflow = preferredHeight > availableHeight + 0.5f;
+        bool lineOverflow = visibleLineCount > 2 && availableHeight <= preferredHeight;
+
+        return heightOverflow || lineOverflow;
+    }
+
+    private List<string> TokenizeForPaging(string content)
+    {
+        List<string> tokens = new List<string>();
+        int i = 0;
+
+        while (i < content.Length)
+        {
+            if (content[i] == '\n')
+            {
+                int newlineCount = 0;
+                while (i < content.Length && content[i] == '\n')
+                {
+                    newlineCount++;
+                    i++;
+                }
+
+                tokens.Add(new string('\n', newlineCount));
+                continue;
+            }
+
+            int start = i;
+            while (i < content.Length && content[i] != ' ' && content[i] != '\n')
+            {
+                i++;
+            }
+
+            if (start != i)
+            {
+                tokens.Add(content.Substring(start, i - start));
+            }
+
+            while (i < content.Length && content[i] == ' ')
+            {
+                tokens.Add(" ");
+                i++;
+            }
+        }
+
+        return tokens;
+    }
+
+    private string[] SplitIntoPagesByCharacterCount(string content)
+    {
+        if (maxCharactersPerPage <= 0 || content.Length <= maxCharactersPerPage)
+        {
+            return new[] { content };
+        }
+
+        List<string> pages = new List<string>();
+        string[] words = content.Split(' ');
+        string currentPage = string.Empty;
+
+        foreach (string word in words)
+        {
+            string candidate = string.IsNullOrEmpty(currentPage) ? word : currentPage + " " + word;
+
+            if (candidate.Length > maxCharactersPerPage && !string.IsNullOrEmpty(currentPage))
+            {
+                pages.Add(currentPage);
+                currentPage = word;
+            }
+            else
+            {
+                currentPage = candidate;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(currentPage))
+        {
+            pages.Add(currentPage);
+        }
+
+        return pages.ToArray();
     }
 
     private void FinishDialogueSequence()
