@@ -4,10 +4,15 @@ public class PlayerMotor : MonoBehaviour
 {
     private CharacterController controller;
     private Vector3 playerVelocity;
+    private Vector3 spawnPosition;
+    private Quaternion spawnRotation;
+    private float fallTimer;
+
     public float speed = 5.0f;
     private bool isGrounded;
     public float gravity = -9.81f;
     public float jumpHeight = 3.0f;
+    public float maxFallDuration = 5.0f;
 
     public bool crouching = false;
     public float crouchTimer = 1;
@@ -19,12 +24,15 @@ public class PlayerMotor : MonoBehaviour
     void Start()
     {
         controller = GetComponent<CharacterController>();
+        spawnPosition = transform.position;
+        spawnRotation = transform.rotation;
     }
 
     // Update is called once per frame
     void Update()
     {
         isGrounded = controller.isGrounded;
+        UpdateFallTimer();
 
         if (lerpCrouch)
         {
@@ -46,6 +54,38 @@ public class PlayerMotor : MonoBehaviour
                 crouchTimer = 0;
             }
         }
+    }
+
+    private void UpdateFallTimer()
+    {
+        if (isGrounded)
+        {
+            fallTimer = 0f;
+            return;
+        }
+
+        if (playerVelocity.y < 0f)
+        {
+            fallTimer += Time.deltaTime;
+
+            if (fallTimer >= maxFallDuration)
+            {
+                RespawnAtSpawnPoint();
+            }
+        }
+        else
+        {
+            fallTimer = 0f;
+        }
+    }
+
+    private void RespawnAtSpawnPoint()
+    {
+        fallTimer = 0f;
+        playerVelocity = Vector3.zero;
+        controller.enabled = false;
+        transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+        controller.enabled = true;
     }
 
     public void ProcessMove(Vector2 input)
