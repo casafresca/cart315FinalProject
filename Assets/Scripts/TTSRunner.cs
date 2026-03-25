@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Networking;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,153 +10,72 @@ using Debug = UnityEngine.Debug;
 
 public class TTSRunner : MonoBehaviour
 {
+    // ✅ GLOBAL ACCESS
+    public static TTSRunner Instance;
+
     [Header("Audio")]
     [SerializeField] AudioSource audioSource;
 
-    [Header("TTS Process")]
-    [SerializeField] bool warmupOnStart = true;
-    [SerializeField] bool cacheVoiceLatents = true;
-
     string ttsRoot;
     string pythonPath;
-    string wavCacheDir;
+    string scriptPath;
 
     Process ttsProcess;
+
     readonly ConcurrentQueue<string> stdoutLines = new();
     readonly ConcurrentQueue<string> stderrLines = new();
     readonly object stdinLock = new();
-    readonly Queue<string> pendingTexts = new();
-    int nextRequestId = 1;
-    bool isReady;
+
+    readonly Queue<string> requestQueue = new();
     bool isProcessingQueue;
-    int outputSampleRate = 24000;
 
-    [Serializable]
-    class TTSReadyMessage
-    {
-        public string type;
-        public int sampleRate;
-    }
-
-    [Serializable]
-    class TTSRequestMessage
-    {
-        public int id;
-        public string text;
-        public string cmd;
-    }
-
-    [Serializable]
-    class TTSResponseMessage
-    {
-        public int id;
-        public string type;
-        public string wavPath;
-        public bool cached;
-        public int sampleRate;
-        public int elapsedMs;
-        public string error;
-    }
+    // ----------------------------------------
 
     void Awake()
     {
-        if (audioSource == null) audioSource = GetComponent<AudioSource>();
-        if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
+        // Singleton
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        // AudioSource safety
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
+        if (audioSource == null)
+            audioSource = gameObject.AddComponent<AudioSource>();
     }
 
     void Start()
     {
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
         pythonPath = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
-        wavCacheDir = Path.Combine(ttsRoot, "wavs");
+        scriptPath = Path.Combine(ttsRoot, "tts_unity_live.py");
 
-        // Check if virtual environment exists
-        if (!File.Exists(pythonPath))
+        ValidatePaths();
+
+        StartTtsProcess();
+    }
+
+    // ----------------------------------------
+    // 🧠 PUBLIC API
+    // ----------------------------------------
+
+    public void Speak(string text, string character = "narrator")
+    {
+        if (string.IsNullOrWhiteSpace(text))
         {
-            Debug.Log("TTS environment missing. Running setup.ps1...");
-            RunSetup();
+            Debug.LogWarning("TTS: Empty text ignored.");
+            return;
         }
 
-        StartTtsServer();
-        Speak("Hello from Unity.");
-    }
+        requestQueue.Enqueue($"{character}:{text}");
 
-    void RunSetup()
-    {
-        ProcessStartInfo start = new()
-        {
-            FileName = "powershell.exe",
-            Arguments = "-ExecutionPolicy Bypass -File setup.ps1",
-
-            WorkingDirectory = ttsRoot,
-
-            UseShellExecute = false,
-            CreateNoWindow = false
-        };
-
-        Process process = Process.Start(start);
-        process.WaitForExit();
-    }
-
-    void StartTtsServer()
-    {
-        if (ttsProcess != null && !ttsProcess.HasExited) return;
-
-        isReady = false;
-        DrainStdout();
-        DrainStderr();
-
-        string scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv2.py");
-        string args = $"-u \"{scriptPath}\" --stdio --out-dir \"{wavCacheDir}\"";
-        if (warmupOnStart)
-            args += " --warmup";
-        if (!cacheVoiceLatents)
-            args += " --no-voice-cache";
-
-        ProcessStartInfo start = new()
-        {
-            FileName = pythonPath,
-            Arguments = args,
-            WorkingDirectory = ttsRoot,
-
-            UseShellExecute = false,
-            CreateNoWindow = true,
-
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-
-        ttsProcess = new Process
-        {
-            StartInfo = start,
-            EnableRaisingEvents = true
-        };
-
-        ttsProcess.OutputDataReceived += (_, e) =>
-        {
-            if (!string.IsNullOrWhiteSpace(e.Data)) stdoutLines.Enqueue(e.Data);
-        };
-
-        ttsProcess.ErrorDataReceived += (_, e) =>
-        {
-            if (!string.IsNullOrWhiteSpace(e.Data)) stderrLines.Enqueue(e.Data);
-        };
-
-        ttsProcess.Exited += (_, _) =>
-        {
-            isReady = false;
-            Debug.LogError("TTS process exited.");
-        };
-
-        ttsProcess.Start();
-        ttsProcess.BeginOutputReadLine();
-        ttsProcess.BeginErrorReadLine();
-    }
-
-    public void Speak(string text)
-    {
-        pendingTexts.Enqueue(text);
         if (!isProcessingQueue)
         {
             isProcessingQueue = true;
@@ -163,166 +83,218 @@ public class TTSRunner : MonoBehaviour
         }
     }
 
-    System.Collections.IEnumerator ProcessQueue()
+    // ----------------------------------------
+
+    IEnumerator ProcessQueue()
     {
-        while (pendingTexts.Count > 0)
+        while (requestQueue.Count > 0)
         {
-            string text = pendingTexts.Dequeue();
-            yield return SpeakOnce(text);
+            string line = requestQueue.Dequeue();
+            yield return SpeakInternal(line);
         }
+
         isProcessingQueue = false;
     }
 
-    System.Collections.IEnumerator SpeakOnce(string text)
+    IEnumerator SpeakInternal(string formattedLine)
     {
-        if (ttsProcess == null || ttsProcess.HasExited) StartTtsServer();
-
-        yield return WaitForReady();
-        if (!isReady)
+        if (!EnsureProcessRunning())
         {
-            Debug.LogError("TTS server not ready.");
+            Debug.LogError("TTS: Process not running.");
             yield break;
         }
 
-        int requestId = nextRequestId++;
-        TTSRequestMessage request = new()
+        // Send to Python
+        try
         {
-            id = requestId,
-            text = text
-        };
-
-        string json = JsonUtility.ToJson(request);
-        lock (stdinLock)
+            lock (stdinLock)
+            {
+                ttsProcess.StandardInput.WriteLine(formattedLine);
+                ttsProcess.StandardInput.Flush();
+            }
+        }
+        catch (Exception e)
         {
-            ttsProcess.StandardInput.WriteLine(json);
-            ttsProcess.StandardInput.Flush();
+            Debug.LogError("TTS write failed: " + e.Message);
+            yield break;
         }
 
-        float timeoutAt = Time.realtimeSinceStartup + 300f;
-        while (Time.realtimeSinceStartup < timeoutAt)
+        // Wait for "ready"
+        float timeout = Time.realtimeSinceStartup + 120f;
+
+        while (Time.realtimeSinceStartup < timeout)
         {
             DrainStderr();
 
             while (stdoutLines.TryDequeue(out string line))
             {
-                if (TryHandleReady(line)) continue;
-
-                TTSResponseMessage response;
-                try { response = JsonUtility.FromJson<TTSResponseMessage>(line); }
-                catch { continue; }
-
-                if (response == null || response.id != requestId)
-                    continue;
-
-                if (response.type == "error")
+                if (line.Trim().ToLower() == "ready")
                 {
-                    Debug.LogError($"TTS error: {response.error}");
+                    string wavPath = Path.Combine(ttsRoot, "output.wav");
+                    yield return PlayWav(wavPath);
                     yield break;
                 }
 
-                if (response.type != "result" || string.IsNullOrWhiteSpace(response.wavPath))
-                {
-                    Debug.LogError($"Unexpected TTS response: {line}");
-                    yield break;
-                }
-
-                outputSampleRate = response.sampleRate > 0 ? response.sampleRate : outputSampleRate;
-                yield return PlayWavFile(response.wavPath);
-                yield break;
+                // Debug unexpected output
+                Debug.Log("[PYTHON STDOUT] " + line);
             }
 
             if (ttsProcess == null || ttsProcess.HasExited)
             {
-                Debug.LogError("TTS process died while waiting for a response.");
+                Debug.LogError("TTS process died during request.");
                 yield break;
             }
 
             yield return null;
         }
 
-        Debug.LogError("Timed out waiting for TTS response.");
+        Debug.LogError("TTS request timed out.");
     }
 
-    System.Collections.IEnumerator WaitForReady()
+    // ----------------------------------------
+    // 🧠 PROCESS MANAGEMENT
+    // ----------------------------------------
+
+    void StartTtsProcess()
     {
-        if (isReady) yield break;
+        if (!EnsureProcessPaths()) return;
 
-        float timeoutAt = Time.realtimeSinceStartup + 600f;
-        while (Time.realtimeSinceStartup < timeoutAt)
+        try
         {
-            DrainStderr();
-
-            while (stdoutLines.TryDequeue(out string line))
+            ProcessStartInfo start = new()
             {
-                if (TryHandleReady(line)) yield break;
-            }
+                FileName = pythonPath,
+                Arguments = $"-u \"{scriptPath}\"",
+                WorkingDirectory = ttsRoot,
 
-            if (ttsProcess == null || ttsProcess.HasExited) yield break;
+                UseShellExecute = false,
+                CreateNoWindow = true,
 
-            yield return null;
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            ttsProcess = new Process
+            {
+                StartInfo = start,
+                EnableRaisingEvents = true
+            };
+
+            ttsProcess.OutputDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(e.Data))
+                    stdoutLines.Enqueue(e.Data);
+            };
+
+            ttsProcess.ErrorDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(e.Data))
+                    stderrLines.Enqueue(e.Data);
+            };
+
+            ttsProcess.Exited += (_, _) =>
+            {
+                Debug.LogError("TTS process exited.");
+            };
+
+            ttsProcess.Start();
+            ttsProcess.BeginOutputReadLine();
+            ttsProcess.BeginErrorReadLine();
+
+            Debug.Log("TTS process started.");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("Failed to start TTS process: " + e.Message);
         }
     }
 
-    bool TryHandleReady(string line)
+    bool EnsureProcessRunning()
     {
-        if (string.IsNullOrWhiteSpace(line) || !line.Contains("\"type\"")) return false;
-
-        TTSReadyMessage ready;
-        try { ready = JsonUtility.FromJson<TTSReadyMessage>(line); }
-        catch { return false; }
-
-        if (ready != null && ready.type == "ready")
-        {
-            isReady = true;
-            if (ready.sampleRate > 0) outputSampleRate = ready.sampleRate;
-            Debug.Log($"TTS ready (sampleRate={outputSampleRate}).");
+        if (ttsProcess != null && !ttsProcess.HasExited)
             return true;
+
+        Debug.LogWarning("TTS restarting process...");
+        StartTtsProcess();
+
+        return ttsProcess != null && !ttsProcess.HasExited;
+    }
+
+    // ----------------------------------------
+    // 📁 PATH VALIDATION
+    // ----------------------------------------
+
+    void ValidatePaths()
+    {
+        Debug.Log("TTS Root: " + ttsRoot);
+        Debug.Log("Python Path: " + pythonPath);
+        Debug.Log("Script Path: " + scriptPath);
+    }
+
+    bool EnsureProcessPaths()
+    {
+        if (!File.Exists(pythonPath))
+        {
+            Debug.LogError("Python not found: " + pythonPath);
+            return false;
         }
 
-        return false;
-    }
-
-    void DrainStderr()
-    {
-        while (stderrLines.TryDequeue(out string errLine))
-            Debug.Log(errLine);
-    }
-
-    void DrainStdout()
-    {
-        while (stdoutLines.TryDequeue(out _))
+        if (!File.Exists(scriptPath))
         {
+            Debug.LogError("Script not found: " + scriptPath);
+            return false;
         }
+
+        return true;
     }
 
-    System.Collections.IEnumerator PlayWavFile(string wavPath)
+    // ----------------------------------------
+    // 🔊 AUDIO
+    // ----------------------------------------
+
+    IEnumerator PlayWav(string path)
     {
-        if (!File.Exists(wavPath))
+        if (!File.Exists(path))
         {
-            Debug.LogError($"WAV not found: {wavPath}");
+            Debug.LogError("WAV missing: " + path);
             yield break;
         }
 
-        string uri = new Uri(wavPath).AbsoluteUri;
+        string uri = new Uri(path).AbsoluteUri;
+
         using UnityWebRequest req = UnityWebRequestMultimedia.GetAudioClip(uri, AudioType.WAV);
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError($"Failed to load WAV: {req.error}");
+            Debug.LogError("Audio load failed: " + req.error);
             yield break;
         }
 
         AudioClip clip = DownloadHandlerAudioClip.GetContent(req);
+
         if (clip == null)
         {
-            Debug.LogError("Failed to decode WAV into AudioClip.");
+            Debug.LogError("Clip decode failed.");
             yield break;
         }
 
         audioSource.clip = clip;
         audioSource.Play();
-        while (audioSource.isPlaying) yield return null;
+
+        while (audioSource.isPlaying)
+            yield return null;
+    }
+
+    // ----------------------------------------
+    // 🧹 CLEANUP
+    // ----------------------------------------
+
+    void DrainStderr()
+    {
+        while (stderrLines.TryDequeue(out string line))
+            Debug.LogError("[PYTHON ERROR] " + line);
     }
 
     void OnDestroy()
@@ -331,20 +303,10 @@ public class TTSRunner : MonoBehaviour
         {
             if (ttsProcess != null && !ttsProcess.HasExited)
             {
-                TTSRequestMessage shutdown = new() { id = 0, cmd = "quit" };
-                string json = JsonUtility.ToJson(shutdown);
-                lock (stdinLock)
-                {
-                    ttsProcess.StandardInput.WriteLine(json);
-                    ttsProcess.StandardInput.Flush();
-                }
-
-                if (!ttsProcess.WaitForExit(1500)) ttsProcess.Kill();
+                ttsProcess.Kill();
+                Debug.Log("TTS process killed.");
             }
         }
-        catch
-        {
-            // ignored
-        }
+        catch { }
     }
 }
