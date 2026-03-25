@@ -4,7 +4,6 @@ using System.Collections;
 using System;
 using UnityEngine.UI;
 using System.Collections.Generic;
-using TMPro;
 
 public class DialogueBox_TR : MonoBehaviour
 {
@@ -26,6 +25,7 @@ public class DialogueBox_TR : MonoBehaviour
         IntroLines,
         QuestionTyping,
         QuestionChoice,
+        WrongAnswerFeedback,
         FollowUpText,
         Completed
     }
@@ -160,6 +160,21 @@ public class DialogueBox_TR : MonoBehaviour
             else
             {
                 ShowOptionsForCurrentQuestion();
+            }
+        }
+        else if (dialogueState == DialogueState.WrongAnswerFeedback)
+        {
+            if (!IsCurrentPageFullyShown())
+            {
+                FinishTypingCurrentText(GetCurrentPageText());
+            }
+            else if (HasMorePages())
+            {
+                ShowNextPage();
+            }
+            else
+            {
+                ReturnToQuestionChoices();
             }
         }
     }
@@ -314,9 +329,10 @@ public class DialogueBox_TR : MonoBehaviour
         }
         else
         {
+            SetOptionButtonsInteractable(false);
             StartPagedText(question.wrongAnswerText);
-            dialogueState = DialogueState.QuestionTyping;
-            Debug.Log("DialogueBox_TR: wrong option selected. Waiting for another choice.");
+            dialogueState = DialogueState.WrongAnswerFeedback;
+            Debug.Log("DialogueBox_TR: wrong option selected. Showing feedback, then re-enabling choices.");
         }
     }
 
@@ -355,6 +371,28 @@ public class DialogueBox_TR : MonoBehaviour
         if (questionOptionsPanel != null)
         {
             questionOptionsPanel.SetActive(false);
+        }
+    }
+
+    private void ReturnToQuestionChoices()
+    {
+        dialogueState = DialogueState.QuestionChoice;
+        SetOptionButtonsInteractable(true);
+    }
+
+    private void SetOptionButtonsInteractable(bool isInteractable)
+    {
+        if (optionButtons == null)
+        {
+            return;
+        }
+
+        foreach (Button button in optionButtons)
+        {
+            if (button != null && button.gameObject.activeSelf)
+            {
+                button.interactable = isInteractable;
+            }
         }
     }
 
