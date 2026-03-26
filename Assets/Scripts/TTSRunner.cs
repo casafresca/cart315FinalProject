@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System;
 using System.Collections;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
@@ -9,6 +10,9 @@ using Debug = UnityEngine.Debug;
 
 public class TTSRunner : MonoBehaviour
 {
+    // ✅ GLOBAL ACCESS
+    public static TTSRunner Instance;
+
     [Header("Audio")]
     [SerializeField] private AudioSource audioSource;
 
