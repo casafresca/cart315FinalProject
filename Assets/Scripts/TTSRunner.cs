@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System;
 using System.Collections;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
@@ -24,8 +23,6 @@ public class TTSRunner : MonoBehaviour
     [SerializeField] private string pythonExe = "python"; // Override in inspector if not in PATH
     private string ttsRoot;
     private string scriptPath;
-    private string wavDir;
-
 
     private Process process;
 
@@ -49,19 +46,15 @@ public class TTSRunner : MonoBehaviour
 
     void Start()
     {
-
         Debug.Log("[TTS] Start() called");
 
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
-        scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv2.py");
-        wavDir = Path.Combine(ttsRoot, "wavs");
+        scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv3.py");
 
         pythonExe = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
 
-
         Debug.Log($"[TTS] Root: {ttsRoot}");
         Debug.Log($"[TTS] Script: {scriptPath}");
-        Debug.Log($"[TTS] WAV dir: {wavDir}");
 
         StartPython();
     }
@@ -70,7 +63,7 @@ public class TTSRunner : MonoBehaviour
     {
         if (Input.GetKeyDown(triggerKey))
         {
-            Debug.Log("[TTS] E pressed");
+            Debug.Log("[TTS] Trigger key pressed");
 
             if (!isReady)
             {
@@ -101,17 +94,12 @@ public class TTSRunner : MonoBehaviour
     {
         Debug.Log("[TTS] Launching Python process...");
 
-        Debug.Log($"[TTS] EXE: {pythonExe}");
-        Debug.Log($"[TTS] ARGS: -u \"{scriptPath}\" --out-dir \"{wavDir}\"");
-        Debug.Log($"[TTS] WorkingDir: {ttsRoot}");
         if (process != null && !process.HasExited) return;
-
-        Debug.Log("Starting Python TTS...");
 
         var psi = new ProcessStartInfo
         {
             FileName = pythonExe,
-            Arguments = $"-u \"{scriptPath}\" --out-dir \"{wavDir}\"",
+            Arguments = $"-u \"{scriptPath}\"", // No --out-dir needed
             WorkingDirectory = ttsRoot,
 
             UseShellExecute = false,
@@ -138,6 +126,8 @@ public class TTSRunner : MonoBehaviour
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
+
+        Debug.Log("[TTS] Python process started");
     }
 
     void StopPython()
@@ -164,9 +154,7 @@ public class TTSRunner : MonoBehaviour
     IEnumerator SpeakRoutine(string text)
     {
         isSpeaking = true;
-
         int id = nextId++;
-
         string json = $"{{\"id\":{id},\"text\":\"{Escape(text)}\"}}";
 
         Debug.Log($"[TTS] Sending: {text}");
@@ -190,13 +178,9 @@ public class TTSRunner : MonoBehaviour
                 {
                     response = JsonUtility.FromJson<TTSResponse>(line);
                 }
-                catch
-                {
-                    continue;
-                }
+                catch { continue; }
 
-                if (response == null || response.id != id)
-                    continue;
+                if (response == null || response.id != id) continue;
 
                 if (response.type == "error")
                 {
@@ -205,9 +189,9 @@ public class TTSRunner : MonoBehaviour
                     yield break;
                 }
 
-                string fullPath = Path.Combine(ttsRoot, response.wavPath);
+                string fullPath = response.wavPath; // Absolute path from Python
 
-                // ✅ yield OUTSIDE try/catch
+                // ✅ Play audio outside try/catch
                 yield return PlayWav(fullPath);
 
                 isSpeaking = false;
@@ -215,11 +199,10 @@ public class TTSRunner : MonoBehaviour
             }
 
             DrainStderr();
-
             yield return null;
         }
 
-        Debug.LogError("TTS timeout.");
+        Debug.LogError("[TTS] Timeout waiting for Python response");
         isSpeaking = false;
     }
 
@@ -266,7 +249,7 @@ public class TTSRunner : MonoBehaviour
             {
                 isReady = true;
                 sampleRate = msg.sampleRate;
-                Debug.Log($"TTS READY (sr={sampleRate})");
+                Debug.Log($"[TTS] READY (sr={sampleRate})");
                 return true;
             }
         }
@@ -337,7 +320,7 @@ public class TTSRunner : MonoBehaviour
     {
         public string type;
         public int id;
-        public string wavPath;
+        public string wavPath; // Absolute path from Python
         public string error;
     }
 }

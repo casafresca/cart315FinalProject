@@ -10,6 +10,6 @@ public class NPCDialogue : MonoBehaviour
             return;
         }
 
-        TTSRunner.Instance.Speak("Welcome to my shop...", "merchant");
+        TTSRunner.Instance.Speak("Welcome to my shop...");
     }
 }
