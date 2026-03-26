@@ -2,13 +2,26 @@ using UnityEngine;
 using Ink.Runtime;
 using UnityEngine.AI;
 
+/// <summary>
+/// Main enemy/ally brain for the soldier NPC.
+/// Handles:
+/// - Combat state (shooting on/off)
+/// - Dialogue transition at low health
+/// - Follow behavior after successful dialogue
+/// - Sprite swapping (idle / walk / attack)
+/// - Ghost + color FX (injury pulse, blue compliance tint)
+/// </summary>
 public class NPC : Interactable
 {
+    // Ink file used when this NPC enters dialogue mode.
     [SerializeField] private TextAsset inkJSON;
+
+    // Cached components and references.
     private NavMeshAgent agent;
     private Transform playerTransform;
     private Rigidbody rb;
 
+    // Runtime states read by other scripts (e.g., NPCShoot, dialogue logic).
     public bool isFollowing = false;
     public bool isCombatActive = false;
 
@@ -57,12 +70,16 @@ public class NPC : Interactable
     [SerializeField] private Color followingTintColor = new Color(0.60f, 0.82f, 1f, 1f);
     [Tooltip("Seconds for blue ally tint to fade in/out.")]
     [SerializeField] private float followingTintFadeDuration = 0.5f;
+    [Tooltip("If true, injured memories slowly fluctuate between normal tint and blue tint.")]
+    [SerializeField] private bool blueWhenInjured = true;
+    [Tooltip("Speed of injured blue fluctuation.")]
+    [SerializeField] private float injuredBlueFluctuationSpeed = 1.2f;
+    [Tooltip("How much blue can be reached while injured (0-1).")]
+    [SerializeField, Range(0f, 1f)] private float injuredBlueMaxBlend = 0.6f;
 
     private float followingTintBlend;
 
-    [Header("Ghost Mode Preset (Optional)")]
-    [Tooltip("Toggle to apply the ghost visual preset values below.")]
-    [SerializeField] private bool ghostMode = false;
+    [Header("Always Ghost (Optional)")]
     [Tooltip("If true, the NPC keeps a ghostly look all the time.")]
     [SerializeField] private bool alwaysGhost = false;
     [Tooltip("Base memory tint while Always Ghost is active.")]
@@ -75,24 +92,13 @@ public class NPC : Interactable
     [SerializeField] private float alwaysGhostPulseSpeed = 1.5f;
     [Tooltip("Strength of the Always Ghost breathing pulse.")]
     [SerializeField, Range(0f, 0.5f)] private float alwaysGhostPulseAmplitude = 0.08f;
-    [Tooltip("Ghost pulse speed override.")]
-    [SerializeField] private float ghostPulseSpeed = 2.8f;
-    [Tooltip("Ghost min alpha override.")]
-    [SerializeField, Range(0f, 1f)] private float ghostMinAlpha = 0.25f;
-    [Tooltip("Ghost max alpha override.")]
-    [SerializeField, Range(0f, 1f)] private float ghostMaxAlpha = 0.72f;
-    [Tooltip("Ghost ally tint override.")]
-    [SerializeField] private Color ghostFollowingTintColor = new Color(0.78f, 0.92f, 1f, 1f);
-    [Tooltip("Ghost tint fade duration override.")]
-    [SerializeField] private float ghostTintFadeDuration = 0.8f;
-    [Tooltip("If true, injured memories also blend toward blue.")]
-    [SerializeField] private bool blueWhenInjured = true;
 
     [Header("Movement Settings")]
     [SerializeField] private float stoppingDistance = 2.5f;
 
     void Start()
     {
+        // Initialize health and start with gun hidden.
         currentHealth = maxHealth;
         if (npcGun != null) npcGun.SetActive(false);
 
@@ -104,6 +110,7 @@ public class NPC : Interactable
 
         if (agent != null)
         {
+            // Agent is enabled only after the NPC agrees to follow.
             agent.enabled = false;
             agent.stoppingDistance = stoppingDistance;
         }
@@ -121,7 +128,7 @@ public class NPC : Interactable
 
     void Update()
     {
-        // TRACKING: Face the player during combat
+        // While hostile, rotate body toward the player so shots feel intentional.
         if (isCombatActive && playerTransform != null)
         {
             Vector3 direction = (playerTransform.position - transform.position).normalized;
@@ -135,15 +142,18 @@ public class NPC : Interactable
 
         if (isFollowing && agent != null && agent.enabled)
         {
+            // When converted to ally mode, keep chasing the player.
             HandleFollowingLogic();
         }
 
+        // Visuals are recomputed every frame from state/health.
         UpdateVisualState();
         UpdateColorEffects();
     }
 
     public void TakeDamage(float amount)
     {
+        // Damage is raw float reduction for now.
         currentHealth -= amount;
 
         // Optional behavior: being shot can force combat mode on.
@@ -154,6 +164,7 @@ public class NPC : Interactable
             if (npcGun != null) npcGun.SetActive(true);
         }
 
+        // At low health, hostile mode is disabled so player can trigger dialogue.
         if (isCombatActive && (currentHealth / maxHealth) <= 0.3f)
         {
             isCombatActive = false;
@@ -161,6 +172,7 @@ public class NPC : Interactable
         }
     }
 
+    // Called by DialogueManager when player fails the conversation.
     public void ResumeCombat()
     {
         isCombatActive = true;
@@ -169,6 +181,7 @@ public class NPC : Interactable
         UpdateVisualState();
     }
 
+    // Called by DialogueManager when player succeeds; NPC becomes ally.
     public void StartFollowing()
     {
         isFollowing = true;
@@ -181,6 +194,7 @@ public class NPC : Interactable
 
     protected override void Interact()
     {
+        // Already allied NPC should not re-open dialogue/combat.
         if (isFollowing) return;
 
         if ((currentHealth / maxHealth) <= 0.3f)
@@ -197,6 +211,7 @@ public class NPC : Interactable
         }
         else if (!isCombatActive)
         {
+            // First interaction at healthy state "wakes up" combat.
             isCombatActive = true;
             if (npcGun != null) npcGun.SetActive(true);
             UpdateVisualState();
@@ -210,7 +225,10 @@ public class NPC : Interactable
             return;
         }
 
-        // Attack image shows when hostile combat is active and NPC is not in follow mode.
+        // Priority:
+        // 1) Attack sprite while hostile
+        // 2) Walk animation while moving
+        // 3) Idle sprite otherwise
         bool showAttack = isCombatActive && !isFollowing;
         bool canAnimateWalk = walkLeftSprite != null && walkRightSprite != null;
         bool isMoving = agent != null && agent.enabled && agent.velocity.sqrMagnitude > (movingSpeedThreshold * movingSpeedThreshold);
@@ -248,46 +266,55 @@ public class NPC : Interactable
             return;
         }
 
+        // Injury is based on health ratio (0..1), not absolute HP value.
         float healthRatio = maxHealth > 0f ? currentHealth / maxHealth : 1f;
         bool isInjured = healthRatio <= injuredThreshold;
 
         // Injured pulse applies only before ally/follow state.
         float alpha = 1f;
-        float activePulseSpeed = ghostMode ? ghostPulseSpeed : injuredPulseSpeed;
-        float activeMinAlpha = ghostMode ? ghostMinAlpha : injuredMinAlpha;
-        float activeMaxAlpha = ghostMode ? ghostMaxAlpha : injuredMaxAlpha;
         if (enableInjuredPulse && isInjured && !isFollowing)
         {
-            float pulse01 = (Mathf.Sin(Time.time * activePulseSpeed) + 1f) * 0.5f;
-            alpha = Mathf.Lerp(activeMinAlpha, activeMaxAlpha, pulse01);
+            float pulse01 = (Mathf.Sin(Time.time * injuredPulseSpeed) + 1f) * 0.5f;
+            alpha = Mathf.Lerp(injuredMinAlpha, injuredMaxAlpha, pulse01);
         }
 
-        bool shouldBlueTint = enableFollowingTint && (isFollowing || (blueWhenInjured && isInjured));
-        float targetTintBlend = shouldBlueTint ? 1f : 0f;
-        float activeFadeDuration = ghostMode ? ghostTintFadeDuration : followingTintFadeDuration;
-        float fadeSpeed = activeFadeDuration > 0.001f ? (1f / activeFadeDuration) : 999f;
+        // Following = full blue. Injured = slow blue fluctuation. Healthy/not following = no blue tint.
+        float targetTintBlend = 0f;
+        if (enableFollowingTint)
+        {
+            if (isFollowing)
+            {
+                targetTintBlend = 1f;
+            }
+            else if (blueWhenInjured && isInjured)
+            {
+                float fluctuation01 = (Mathf.Sin(Time.time * injuredBlueFluctuationSpeed) + 1f) * 0.5f;
+                targetTintBlend = Mathf.Lerp(0f, injuredBlueMaxBlend, fluctuation01);
+            }
+        }
+
+        float fadeSpeed = followingTintFadeDuration > 0.001f ? (1f / followingTintFadeDuration) : 999f;
         followingTintBlend = Mathf.MoveTowards(followingTintBlend, targetTintBlend, fadeSpeed * Time.deltaTime);
 
-        Color activeFollowTint = ghostMode ? ghostFollowingTintColor : followingTintColor;
-        bool useGhostBase = ghostMode || alwaysGhost;
-        Color baseTint = useGhostBase ? alwaysGhostBaseTint : Color.white;
-        float baseAlpha = useGhostBase ? alwaysGhostBaseAlpha : 1f;
+        Color baseTint = alwaysGhost ? alwaysGhostBaseTint : Color.white;
+        float baseAlpha = alwaysGhost ? alwaysGhostBaseAlpha : 1f;
 
-        if (useGhostBase && alwaysGhostBreathingPulse)
+        if (alwaysGhost && alwaysGhostBreathingPulse)
         {
+            // Subtle low-frequency alpha movement for "memory/ghost" feel.
             float breath01 = (Mathf.Sin(Time.time * alwaysGhostPulseSpeed) + 1f) * 0.5f;
             baseAlpha += Mathf.Lerp(-alwaysGhostPulseAmplitude, alwaysGhostPulseAmplitude, breath01);
             baseAlpha = Mathf.Clamp01(baseAlpha);
         }
 
-        Color tint = Color.Lerp(baseTint, activeFollowTint, followingTintBlend);
+        Color tint = Color.Lerp(baseTint, followingTintColor, followingTintBlend);
         tint.a *= baseAlpha * alpha;
         spriteRenderer.color = tint;
     }
 
     private void HandleFollowingLogic()
     {
-        // Your existing Y-axis floor fix
+        // Safety clamp to keep follower from sinking below floor in your scene setup.
         if (transform.position.y < 0.15f)
         {
             Vector3 fixedPos = transform.position;
@@ -297,6 +324,7 @@ public class NPC : Interactable
 
         if (playerTransform != null)
         {
+            // Keep some distance so NPC doesn't overlap the player.
             agent.SetDestination(playerTransform.position);
             agent.isStopped = Vector3.Distance(transform.position, playerTransform.position) < stoppingDistance;
         }

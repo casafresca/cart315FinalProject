@@ -3515,8 +3515,8 @@ MonoBehaviour:
   spriteRenderer: {fileID: 0}
   idleSprite: {fileID: 21300000, guid: e48be5ff34250e84a90721c5004aad53, type: 3}
   attackSprite: {fileID: 21300000, guid: 6568190b79931bb41936fd7b4836b9d6, type: 3}
-  walkLeftSprite: {fileID: 21300000, guid: 98a0fea36bba77b49a7a551ea741157d, type: 3}
-  walkRightSprite: {fileID: 21300000, guid: 50f78fe6dc9887743b26e0d4faeeeef4, type: 3}
+  walkLeftSprite: {fileID: 21300000, guid: e48be5ff34250e84a90721c5004aad53, type: 3}
+  walkRightSprite: {fileID: 21300000, guid: e48be5ff34250e84a90721c5004aad53, type: 3}
   walkAnimFps: 5
   movingSpeedThreshold: 0.05
   injuredThreshold: 0.3
@@ -3527,12 +3527,15 @@ MonoBehaviour:
   enableFollowingTint: 1
   followingTintColor: {r: 0.6, g: 0.82, b: 1, a: 1}
   followingTintFadeDuration: 0.5
-  ghostMode: 0
-  ghostPulseSpeed: 2.8
-  ghostMinAlpha: 0.25
-  ghostMaxAlpha: 0.72
-  ghostFollowingTintColor: {r: 0.78, g: 0.92, b: 1, a: 1}
-  ghostTintFadeDuration: 0.8
+  blueWhenInjured: 1
+  injuredBlueFluctuationSpeed: 1.2
+  injuredBlueMaxBlend: 0.6
+  alwaysGhost: 0
+  alwaysGhostBaseTint: {r: 0.82, g: 0.76, b: 0.7, a: 1}
+  alwaysGhostBaseAlpha: 0.78
+  alwaysGhostBreathingPulse: 1
+  alwaysGhostPulseSpeed: 1.5
+  alwaysGhostPulseAmplitude: 0.08
   stoppingDistance: 2.5
 --- !u!136 &1701470291
 CapsuleCollider:
