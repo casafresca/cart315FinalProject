@@ -96,6 +96,12 @@ public class NPC : Interactable
     [Header("Movement Settings")]
     [SerializeField] private float stoppingDistance = 2.5f;
 
+    [Header("Simple Combat Movement")]
+    [SerializeField] private float moveSpeed = 2f;
+    [SerializeField] private float changeDirInterval = 2f;
+    private Vector3 moveDirection;
+    private float moveTimer;
+
     void Start()
     {
         // Initialize health and start with gun hidden.
@@ -131,15 +137,11 @@ public class NPC : Interactable
         // While hostile, rotate body toward the player so shots feel intentional.
         if (isCombatActive && playerTransform != null)
         {
-            Vector3 direction = (playerTransform.position - transform.position).normalized;
-            direction.y = 0;
-            if (direction != Vector3.zero)
-            {
-                Quaternion targetRot = Quaternion.LookRotation(direction);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 5f);
-            }
+            HandleSimpleCombatMovement();
+            HandleAiming();
         }
 
+        // 2. FOLLOWING BEHAVIOR (Your original working logic)
         if (isFollowing && agent != null && agent.enabled)
         {
             // When converted to ally mode, keep chasing the player.
@@ -149,6 +151,50 @@ public class NPC : Interactable
         // Visuals are recomputed every frame from state/health.
         UpdateVisualState();
         UpdateColorEffects();
+    }
+
+    private void HandleSimpleCombatMovement()
+    {
+        moveTimer += Time.deltaTime;
+        if (moveTimer >= changeDirInterval)
+        {
+            float randomX = Random.Range(-1f, 1f);
+            float randomZ = Random.Range(-1f, 1f);
+            moveDirection = new Vector3(randomX, 0, randomZ).normalized;
+            moveTimer = 0;
+        }
+
+        // Simple nudge movement
+        transform.Translate(moveDirection * moveSpeed * Time.deltaTime, Space.World);
+    }
+
+    private void HandleAiming()
+    {
+        if (playerTransform == null) return;
+
+        // Rotate Body
+        Vector3 direction = (playerTransform.position - transform.position).normalized;
+        direction.y = 0;
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRot = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
+        }
+
+        // Aim GunPivot (Shoulder) with Clamps
+        if (npcGun != null)
+        {
+            npcGun.transform.LookAt(playerTransform.position + Vector3.up * 1.2f);
+            Vector3 localRot = npcGun.transform.localEulerAngles;
+
+            if (localRot.x > 180) localRot.x -= 360;
+            if (localRot.y > 180) localRot.y -= 360;
+
+            localRot.x = Mathf.Clamp(localRot.x, -30f, 30f);
+            localRot.y = Mathf.Clamp(localRot.y, -50f, 50f);
+
+            npcGun.transform.localEulerAngles = new Vector3(localRot.x, localRot.y, 0f);
+        }
     }
 
     public void TakeDamage(float amount)
@@ -168,7 +214,9 @@ public class NPC : Interactable
         if (isCombatActive && (currentHealth / maxHealth) <= 0.3f)
         {
             isCombatActive = false;
+            moveDirection = Vector3.zero;
             if (npcGun != null) npcGun.SetActive(false);
+            Debug.Log("NPC Staggered. Ready for interaction.");
         }
     }
 
@@ -186,8 +234,35 @@ public class NPC : Interactable
     {
         isFollowing = true;
         isCombatActive = false;
+        moveDirection = Vector3.zero;
+
         if (npcGun != null) npcGun.SetActive(false);
-        if (agent != null) agent.enabled = true;
+
+        // Physics Fix: Ignore player so the NPC doesn't get "pushed" away
+        if (playerTransform != null)
+        {
+            Collider pCol = playerTransform.GetComponent<Collider>();
+            Collider nCol = GetComponent<Collider>();
+            if (pCol != null && nCol != null) Physics.IgnoreCollision(nCol, pCol, true);
+        }
+
+        // Safe Enable: Snap to floor before turning on Agent
+        NavMeshHit hit;
+        if (NavMesh.SamplePosition(transform.position, out hit, 2.0f, NavMesh.AllAreas))
+        {
+            transform.position = hit.position;
+        }
+
+        if (agent != null)
+        {
+            agent.enabled = true;
+            if (agent.isActiveAndEnabled)
+            {
+                agent.Warp(transform.position); // Ensure the agent is grounded
+                agent.updateRotation = true;
+            }
+        }
+
         if (rb != null) rb.isKinematic = true;
         UpdateVisualState();
     }
@@ -322,7 +397,7 @@ public class NPC : Interactable
             transform.position = fixedPos;
         }
 
-        if (playerTransform != null)
+        if (playerTransform != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
         {
             // Keep some distance so NPC doesn't overlap the player.
             agent.SetDestination(playerTransform.position);
