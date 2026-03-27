@@ -22,7 +22,9 @@ def log(message: str):
     timestamp = time.strftime("%H:%M:%S")
     print(f"[{timestamp}] {message}", flush=True)
 
-# ------------------------- Initialize TTS -------------------------
+# -------------------------
+# Initialize TTS
+# -------------------------
 def initialize():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
@@ -35,16 +37,20 @@ def initialize():
     speaker_wavs = resolve_existing_files(NARRATOR_FILES)
     return tts, sample_rate, speaker_wavs
 
-# ------------------------- Main server loop -------------------------
+# -------------------------
+# Main server loop
+# -------------------------
 def main():
-    # Save WAVs permanently in ../../Resources/TTSWavs relative to this script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    out_dir = os.path.abspath(os.path.join(script_dir, "../../Resources/TTSWavs"))
+    out_dir = "wavs"  # default
+    for i, arg in enumerate(sys.argv):
+        if arg == "--out-dir" and i + 1 < len(sys.argv):
+            out_dir = sys.argv[i + 1]
     os.makedirs(out_dir, exist_ok=True)
+    out_dir = os.path.abspath(out_dir)
 
     tts, sample_rate, speaker_wavs = initialize()
 
-    # Send READY to Unity
+    # ✅ Send READY to Unity
     ready_msg = {"type": "ready", "sampleRate": sample_rate}
     print(json.dumps(ready_msg), flush=True)
 
@@ -82,12 +88,12 @@ def main():
             )
             wav_np = np.asarray(wav, dtype=np.float32)
 
-            # Save WAV permanently
+            # Save permanently
             out_path = os.path.join(out_dir, f"tts_{request_id}_{int(time.time()*1000)}.wav")
             sf.write(out_path, wav_np, sample_rate)
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
-            # Send absolute path to Unity
+            # ✅ Send result to Unity
             response = {
                 "type": "result",
                 "id": request_id,

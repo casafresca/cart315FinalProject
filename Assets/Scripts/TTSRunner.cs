@@ -23,6 +23,8 @@ public class TTSRunner : MonoBehaviour
     [SerializeField] private string pythonExe = "python"; // Override in inspector if not in PATH
     private string ttsRoot;
     private string scriptPath;
+    private string wavDir;
+
 
     private Process process;
 
@@ -46,12 +48,14 @@ public class TTSRunner : MonoBehaviour
 
     void Start()
     {
+
         Debug.Log("[TTS] Start() called");
 
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
         scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv3.py");
+        *+
+                pythonExe = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
 
-        pythonExe = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
 
         Debug.Log($"[TTS] Root: {ttsRoot}");
         Debug.Log($"[TTS] Script: {scriptPath}");
@@ -63,7 +67,7 @@ public class TTSRunner : MonoBehaviour
     {
         if (Input.GetKeyDown(triggerKey))
         {
-            Debug.Log("[TTS] Trigger key pressed");
+            Debug.Log("[TTS] E pressed");
 
             if (!isReady)
             {
@@ -94,12 +98,17 @@ public class TTSRunner : MonoBehaviour
     {
         Debug.Log("[TTS] Launching Python process...");
 
+        Debug.Log($"[TTS] EXE: {pythonExe}");
+        Debug.Log($"[TTS] ARGS: -u \"{scriptPath}\" --out-dir \"{wavDir}\"");
+        Debug.Log($"[TTS] WorkingDir: {ttsRoot}");
         if (process != null && !process.HasExited) return;
+
+        Debug.Log("Starting Python TTS...");
 
         var psi = new ProcessStartInfo
         {
             FileName = pythonExe,
-            Arguments = $"-u \"{scriptPath}\"", // No --out-dir needed
+            Arguments = $"-u \"{scriptPath}\"",
             WorkingDirectory = ttsRoot,
 
             UseShellExecute = false,
@@ -126,8 +135,6 @@ public class TTSRunner : MonoBehaviour
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-
-        Debug.Log("[TTS] Python process started");
     }
 
     void StopPython()
@@ -154,7 +161,9 @@ public class TTSRunner : MonoBehaviour
     IEnumerator SpeakRoutine(string text)
     {
         isSpeaking = true;
+
         int id = nextId++;
+
         string json = $"{{\"id\":{id},\"text\":\"{Escape(text)}\"}}";
 
         Debug.Log($"[TTS] Sending: {text}");
@@ -178,9 +187,13 @@ public class TTSRunner : MonoBehaviour
                 {
                     response = JsonUtility.FromJson<TTSResponse>(line);
                 }
-                catch { continue; }
+                catch
+                {
+                    continue;
+                }
 
-                if (response == null || response.id != id) continue;
+                if (response == null || response.id != id)
+                    continue;
 
                 if (response.type == "error")
                 {
@@ -189,9 +202,9 @@ public class TTSRunner : MonoBehaviour
                     yield break;
                 }
 
-                string fullPath = response.wavPath; // Absolute path from Python
+                string fullPath = response.wavPath;
 
-                // ✅ Play audio outside try/catch
+                // ✅ yield OUTSIDE try/catch
                 yield return PlayWav(fullPath);
 
                 isSpeaking = false;
@@ -199,10 +212,11 @@ public class TTSRunner : MonoBehaviour
             }
 
             DrainStderr();
+
             yield return null;
         }
 
-        Debug.LogError("[TTS] Timeout waiting for Python response");
+        Debug.LogError("TTS timeout.");
         isSpeaking = false;
     }
 
@@ -249,7 +263,7 @@ public class TTSRunner : MonoBehaviour
             {
                 isReady = true;
                 sampleRate = msg.sampleRate;
-                Debug.Log($"[TTS] READY (sr={sampleRate})");
+                Debug.Log($"TTS READY (sr={sampleRate})");
                 return true;
             }
         }
@@ -320,7 +334,7 @@ public class TTSRunner : MonoBehaviour
     {
         public string type;
         public int id;
-        public string wavPath; // Absolute path from Python
+        public string wavPath;
         public string error;
     }
 }
