@@ -41,12 +41,15 @@ def initialize():
 # Main server loop
 # -------------------------
 def main():
-    out_dir = "wavs"  # default
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    out_dir = os.path.join(script_dir, "wavs")  # default output inside this script folder
     for i, arg in enumerate(sys.argv):
         if arg == "--out-dir" and i + 1 < len(sys.argv):
-            out_dir = sys.argv[i + 1]
+            requested = sys.argv[i + 1]
+            out_dir = requested if os.path.isabs(requested) else os.path.join(script_dir, requested)
     os.makedirs(out_dir, exist_ok=True)
     out_dir = os.path.abspath(out_dir)
+    log(f"Output directory: {out_dir}")
 
     tts, sample_rate, speaker_wavs = initialize()
 
@@ -89,9 +92,9 @@ def main():
             wav_np = np.asarray(wav, dtype=np.float32)
 
             # Save permanently
-            out_path = os.path.join(out_dir, f"tts_{request_id}_{int(time.time()*1000)}.wav")
-            out_path = out_path.replace("\\", "/")
+            out_path = os.path.abspath(os.path.join(out_dir, f"tts_{request_id}_{int(time.time()*1000)}.wav"))
             sf.write(out_path, wav_np, sample_rate)
+            log(f"Wrote WAV file: {out_path} ({os.path.getsize(out_path)} bytes)")
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
             # ✅ Send result to Unity
