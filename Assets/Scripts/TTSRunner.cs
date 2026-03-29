@@ -326,6 +326,19 @@ public class TTSRunner : MonoBehaviour
             yield return null;
 
         Debug.Log("[TTS] Playback finished");
+
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+                Debug.Log("[TTS] Deleted temp WAV: " + path);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[TTS] Failed to delete WAV: " + ex.Message);
+        }
     }
 
     string Escape(string s)
