@@ -24,6 +24,7 @@ public class NPC : Interactable
     // Runtime states read by other scripts (e.g., NPCShoot, dialogue logic).
     public bool isFollowing = false;
     public bool isCombatActive = false;
+    public bool isDead { get; private set; }
 
     [Header("Combat & Health")]
     public float maxHealth = 100f;
@@ -31,6 +32,10 @@ public class NPC : Interactable
     public GameObject npcGun;
     [Tooltip("If true, the NPC enters combat when hit by a bullet.")]
     [SerializeField] private bool becomeHostileWhenShot = true;
+    [Tooltip("Health ratio where combat stops and dialogue becomes available.")]
+    [SerializeField, Range(0.05f, 0.95f)] private float dialogueHealthThreshold = 0.3f;
+    [Tooltip("If true, damage stops at the dialogue threshold instead of killing the NPC outright.")]
+    [SerializeField] private bool preventDeathBeforeDialogue = true;
 
     [Header("2D Sprite Visual (Optional)")]
     [Tooltip("SpriteRenderer used for 2D enemy art in the 3D world.")]
@@ -101,6 +106,7 @@ public class NPC : Interactable
     [SerializeField] private float changeDirInterval = 2f;
     private Vector3 moveDirection;
     private float moveTimer;
+    private const float DialogueThresholdEpsilon = 0.0001f;
 
     void Start()
     {
@@ -199,8 +205,14 @@ public class NPC : Interactable
 
     public void TakeDamage(float amount)
     {
+        if (isDead || amount <= 0f)
+        {
+            return;
+        }
+
         // Damage is raw float reduction for now.
         currentHealth -= amount;
+        currentHealth = Mathf.Min(currentHealth, maxHealth);
 
         // Optional behavior: being shot can force combat mode on.
         // This is useful for sprite swapping (idle -> attack) and return fire.
@@ -210,8 +222,31 @@ public class NPC : Interactable
             if (npcGun != null) npcGun.SetActive(true);
         }
 
+        bool canEnterDialogue = !isFollowing && inkJSON != null;
+        float healthRatio = maxHealth > 0f ? currentHealth / maxHealth : 0f;
+
+        if (canEnterDialogue && IsAtDialogueThreshold())
+        {
+            if (preventDeathBeforeDialogue)
+            {
+                currentHealth = Mathf.Max(currentHealth, maxHealth * dialogueHealthThreshold);
+            }
+
+            isCombatActive = false;
+            moveDirection = Vector3.zero;
+            if (npcGun != null) npcGun.SetActive(false);
+            Debug.Log("NPC Staggered. Ready for interaction.");
+            return;
+        }
+
+        if (currentHealth <= 0f)
+        {
+            Die();
+            return;
+        }
+
         // At low health, hostile mode is disabled so player can trigger dialogue.
-        if (isCombatActive && (currentHealth / maxHealth) <= 0.3f)
+        if (isCombatActive && IsAtDialogueThreshold())
         {
             isCombatActive = false;
             moveDirection = Vector3.zero;
@@ -269,10 +304,12 @@ public class NPC : Interactable
 
     protected override void Interact()
     {
-        // Already allied NPC should not re-open dialogue/combat.
-        if (isFollowing) return;
+        Debug.Log($"NPC.Interact called. isFollowing={isFollowing}, isDead={isDead}, currentHealth={currentHealth}, maxHealth={maxHealth}, healthRatio={(maxHealth > 0f ? currentHealth / maxHealth : 0f)}, threshold={dialogueHealthThreshold}, isCombatActive={isCombatActive}");
 
-        if ((currentHealth / maxHealth) <= 0.3f)
+        // Already allied NPC should not re-open dialogue/combat.
+        if (isFollowing || isDead) return;
+
+        if (IsAtDialogueThreshold())
         {
             // Pause combat while dialogue is active.
             // DialogueManager will decide outcome after choices:
@@ -282,7 +319,15 @@ public class NPC : Interactable
             if (npcGun != null) npcGun.SetActive(false);
             UpdateVisualState();
 
-            DialogueManager.GetInstance().EnterDialogueMode(inkJSON, this);
+            DialogueManager dialogueManager = DialogueManager.GetInstance();
+            if (dialogueManager == null)
+            {
+                Debug.LogError("NPC: DialogueManager instance was not found.");
+                return;
+            }
+
+            Debug.Log("NPC is entering dialogue mode.");
+            dialogueManager.EnterDialogueMode(inkJSON, this);
         }
         else if (!isCombatActive)
         {
@@ -403,5 +448,43 @@ public class NPC : Interactable
             agent.SetDestination(playerTransform.position);
             agent.isStopped = Vector3.Distance(transform.position, playerTransform.position) < stoppingDistance;
         }
+    }
+
+    private void Die()
+    {
+        isDead = true;
+        isCombatActive = false;
+        isFollowing = false;
+        moveDirection = Vector3.zero;
+        currentHealth = 0f;
+
+        if (npcGun != null)
+        {
+            npcGun.SetActive(false);
+        }
+
+        if (agent != null && agent.enabled)
+        {
+            agent.isStopped = true;
+            agent.ResetPath();
+            agent.enabled = false;
+        }
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+        }
+
+        Debug.Log("NPC died.");
+    }
+
+    private bool IsAtDialogueThreshold()
+    {
+        if (maxHealth <= 0f)
+        {
+            return true;
+        }
+
+        return currentHealth <= (maxHealth * dialogueHealthThreshold) + DialogueThresholdEpsilon;
     }
 }
