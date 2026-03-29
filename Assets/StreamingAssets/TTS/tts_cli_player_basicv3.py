@@ -56,11 +56,14 @@ def main():
     # ✅ Send READY to Unity
     ready_msg = {"type": "ready", "sampleRate": sample_rate}
     print(json.dumps(ready_msg), flush=True)
+    log("Ready message sent to Unity")
 
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
+
+        log(f"Received line: {line}")
 
         try:
             msg = json.loads(line)
@@ -107,7 +110,8 @@ def main():
                 "elapsedMs": elapsed_ms
             }
             print(json.dumps(response), flush=True)
-
+            log(f"Result sent for request {request_id}")
+            
         except Exception as e:
             log(f"Error: {e}")
             traceback.print_exc()

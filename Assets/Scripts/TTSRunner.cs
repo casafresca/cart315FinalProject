@@ -25,6 +25,8 @@ public class TTSRunner : MonoBehaviour
     private string scriptPath;
     private string wavDir;
 
+    readonly ConcurrentQueue<string> resultQueue = new ConcurrentQueue<string>();
+
 
     private Process process;
 
@@ -49,15 +51,14 @@ public class TTSRunner : MonoBehaviour
     void Start()
     {
 
-        Debug.Log("[TTS] Start() called");
+        Debug.Log("[TTS] Start() called on line 54 of TTSRunner.cs");
 
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
         scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv3.py");
         pythonExe = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
 
-
-        Debug.Log($"[TTS] Root: {ttsRoot}");
-        Debug.Log($"[TTS] Script: {scriptPath}");
+        Debug.Log($"[TTS] Root: {ttsRoot} on line 60 of TTSRunner.cs");
+        Debug.Log($"[TTS] Script: {scriptPath} on line 61 of TTSRunner.cs");
 
         StartPython();
     }
@@ -82,7 +83,7 @@ public class TTSRunner : MonoBehaviour
             }
         }
 
-        // DrainQueues();
+        DrainQueues();
     }
 
     void OnDestroy()
@@ -95,14 +96,14 @@ public class TTSRunner : MonoBehaviour
     // -------------------------
     void StartPython()
     {
-        Debug.Log("[TTS] Launching Python process...");
+        Debug.Log("[TTS] Launching Python process... on line 89 of TTSRunner.cs");
 
-        Debug.Log($"[TTS] EXE: {pythonExe}");
-        Debug.Log($"[TTS] ARGS: -u \"{scriptPath}\" --out-dir \"{wavDir}\"");
-        Debug.Log($"[TTS] WorkingDir: {ttsRoot}");
+        Debug.Log($"[TTS] EXE: {pythonExe} on line 91 of TTSRunner.cs");
+        Debug.Log($"[TTS] ARGS: -u \"{scriptPath}\" --out-dir \"{wavDir}\" on line 92 of TTSRunner.cs");
+        Debug.Log($"[TTS] WorkingDir: {ttsRoot} on line 93 of TTSRunner.cs");
         if (process != null && !process.HasExited) return;
 
-        Debug.Log("Starting Python TTS...");
+        Debug.Log("Starting Python TTS... on line 97 of TTSRunner.cs");
 
         var psi = new ProcessStartInfo
         {
@@ -165,22 +166,24 @@ public class TTSRunner : MonoBehaviour
 
         string json = $"{{\"id\":{id},\"text\":\"{Escape(text)}\"}}";
 
-        Debug.Log($"[TTS] Sending: {text}");
+        Debug.Log($"[TTS] Sending: {text} on line 120 of TTSRunner.cs");
         SendJson(json);
 
         float timeout = Time.time + 30f;
 
         while (Time.time < timeout)
         {
-            while (stdoutQueue.TryDequeue(out string line))
+            while (resultQueue.TryDequeue(out string line))
             {
-                Debug.Log("[PY STDOUT] " + line);
+                Debug.Log("[PY STDOUT] " + line + " on line 130 of TTSRunner.cs");
 
                 if (TryHandleReady(line)) continue;
 
                 if (!line.Contains("\"type\"")) continue;
 
-                TTSResponse response = null;
+                TTSResponse response;
+
+                Debug.Log($"[TTS] Processing response for ID {id}... on line 141 of TTSRunner.cs");
 
                 try
                 {
@@ -192,11 +195,14 @@ public class TTSRunner : MonoBehaviour
                 }
 
                 if (response == null || response.id != id)
+                {
+                    Debug.LogWarning("[TTS] Ignoring unrelated message: " + line + " on line 150 of TTSRunner.cs");
                     continue;
+                }
 
                 if (response.type == "error")
                 {
-                    Debug.LogError("[TTS ERROR] " + response.error);
+                    Debug.LogError("[TTS ERROR] " + response.error + " on line 158 of TTSRunner.cs");
                     isSpeaking = false;
                     yield break;
                 }
@@ -210,7 +216,7 @@ public class TTSRunner : MonoBehaviour
                 yield break;
             }
 
-            DrainStderr();
+            DrainQueues();
 
             yield return null;
         }
@@ -238,17 +244,26 @@ public class TTSRunner : MonoBehaviour
     {
         while (stdoutQueue.TryDequeue(out string line))
         {
-            Debug.Log("[PY STDOUT] " + line);
-            TryHandleReady(line);
+            Debug.Log("[PY STDOUT] " + line + " on line 165 of TTSRunner.cs");
+
+            // Try READY first
+            if (TryHandleReady(line))
+                continue;
+
+            // If it's a result message, store it for SpeakRoutine
+            if (line.Contains("\"type\""))
+            {
+                try
+                {
+                    var response = JsonUtility.FromJson<TTSResponse>(line);
+                    if (response != null && response.type == "result")
+                    {
+                        resultQueue.Enqueue(line);
+                    }
+                }
+                catch { }
+            }
         }
-
-        DrainStderr();
-    }
-
-    void DrainStderr()
-    {
-        while (stderrQueue.TryDequeue(out string err))
-            Debug.LogWarning("[PY STDERR] " + err);
     }
 
     bool TryHandleReady(string line)
