@@ -157,13 +157,11 @@ public class DialogueManager : MonoBehaviour
 
         if (npcPoints >= 3)
         {
-            Debug.Log($"NPC dialogue result: SUCCESS ({npcPoints}/3). NPC should follow now.");
             if (audioSource != null && successSound != null) audioSource.PlayOneShot(successSound);
             currentNPC.StartFollowing();
         }
         else
         {
-            Debug.Log($"NPC dialogue result: FAIL ({npcPoints}/3). NPC resumes combat.");
             if (audioSource != null && failureSound != null) audioSource.PlayOneShot(failureSound);
             currentNPC.ResumeCombat();
         }
