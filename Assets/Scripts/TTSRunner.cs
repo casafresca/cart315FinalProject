@@ -53,8 +53,7 @@ public class TTSRunner : MonoBehaviour
 
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
         scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv3.py");
-        *+
-                pythonExe = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
+        pythonExe = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
 
 
         Debug.Log($"[TTS] Root: {ttsRoot}");

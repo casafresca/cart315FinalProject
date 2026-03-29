@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
+    path: Assets/Scenes/3DEnvironmentSceneTest.unity
+    guid: c25d556aee48f6f4c8c6d9db5719ab80
+  - enabled: 1
     path: Assets/Scenes/therapy room.unity
     guid: 27242f350e3a88940ba59245e1d0af77
   m_configObjects:

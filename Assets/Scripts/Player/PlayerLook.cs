@@ -12,7 +12,8 @@ public class PlayerLook : MonoBehaviour
     public void ProcessLook(Vector2 lookInput)
     {
         // If dialogue is playing, don't rotate the camera
-        if (DialogueManager.GetInstance().dialogueIsPlaying) return;
+        DialogueManager dialogueManager = DialogueManager.GetInstance();
+        if (dialogueManager != null && dialogueManager.dialogueIsPlaying) return;
 
         float mouseX = lookInput.x * xSensitivity * Time.deltaTime;
         float mouseY = lookInput.y * ySensitivity * Time.deltaTime;
