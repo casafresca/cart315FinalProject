@@ -90,6 +90,7 @@ def main():
 
             # Save permanently
             out_path = os.path.join(out_dir, f"tts_{request_id}_{int(time.time()*1000)}.wav")
+            out_path = out_path.replace("\\", "/")
             sf.write(out_path, wav_np, sample_rate)
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
