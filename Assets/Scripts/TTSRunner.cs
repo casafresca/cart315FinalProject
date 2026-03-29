@@ -82,7 +82,7 @@ public class TTSRunner : MonoBehaviour
             }
         }
 
-        DrainQueues();
+        // DrainQueues();
     }
 
     void OnDestroy()
