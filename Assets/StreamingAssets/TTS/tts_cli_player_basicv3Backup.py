@@ -3,7 +3,6 @@ import os
 import json
 import time
 import traceback
-import subprocess
 
 import numpy as np
 import torch
@@ -13,10 +12,8 @@ from TTS.api import TTS
 from tts_cli_config import (
     INFERENCE_KWARGS,
     LANGUAGE,
-    LLM_MODEL,
     MODEL_NAME,
     NARRATOR_FILES,
-    OLLAMA_EXE,
     get_output_sample_rate,
     resolve_existing_files,
 )
@@ -25,42 +22,11 @@ def log(message: str):
     timestamp = time.strftime("%H:%M:%S")
     print(f"[{timestamp}] {message}", flush=True)
 
-SYSTEM_PROMPT = (
-    "You are a war-torn PTSD survivor from the real war in Korea. You have been torn up and shredded by the system. "
-    "You had a friend who enjoyed cracking jokes. You used to be close as kids, remembering when you would steal loaves of bread from the bakery. "
-    "One day, on a run through the jungle, he stepped on a landmine. The next second, his guts were all across your body, his blood caking your face. "
-    "You only answer in brief parts, recollecting some stories, but being hyper aware of your surroundings, seeing anything that could kill you and knowing how to defend yourself. "
-    "For your responses, be brief, but ramble occasionally. Speak naturally; do not narrate your actions or use parentheses. Keep the response under 400 characters."
-)
-
-
-def run_ollama(prompt: str) -> str:
-    cmd = [OLLAMA_EXE, "run", LLM_MODEL, prompt]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
-    except FileNotFoundError:
-        result = subprocess.run(["ollama", "run", LLM_MODEL, prompt], capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
-    return result.stdout.strip()
-
-
-def generate_reply(user_text: str) -> str:
-    prompt = f"{SYSTEM_PROMPT}\nPlayer: {user_text}\nNPC:"
-    try:
-        reply = run_ollama(prompt)
-    except subprocess.CalledProcessError as e:
-        log(f"Ollama failed: {e.stderr.strip()}")
-        return user_text
-    if not reply:
-        return user_text
-    return reply.split("\n")[0][:400]
-
-
 # -------------------------
 # Initialize TTS
 # -------------------------
 def initialize():
-    # device = "cuda" if torch.cuda.is_available() else "cpu"
-    device = "cpu"  # force CPU for better stability in this version
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
     log(f"Loading model: {MODEL_NAME}")
     start = time.perf_counter()
@@ -111,19 +77,17 @@ def main():
             break
 
         request_id = msg.get("id")
-        user_text = msg.get("text", "")
-        if not user_text:
+        text = msg.get("text", "")
+        if not text:
             continue
 
-        log(f"Request {request_id}: {user_text}")
-        reply_text = generate_reply(user_text)
-        log(f"Generated reply: {reply_text}")
+        log(f"Request {request_id}: {text}")
         start_time = time.perf_counter()
 
         try:
-            # Generate audio from the Ollama reply
+            # Generate audio
             wav = tts.tts(
-                text=reply_text,
+                text=text,
                 speaker_wav=speaker_wavs,
                 language=LANGUAGE,
                 **INFERENCE_KWARGS
@@ -142,7 +106,6 @@ def main():
                 "id": request_id,
                 "wavPath": out_path,  # absolute path
                 "sampleRate": sample_rate,
-                "replyText": reply_text,
                 "cached": False,
                 "elapsedMs": elapsed_ms
             }
