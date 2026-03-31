@@ -20,6 +20,7 @@ LANGUAGE: str = _env("TTS_LANGUAGE", "en")
 # Ollama / LLM settings (used by the *_llm*.py scripts)
 LLM_MODEL: str = _env("LLM_MODEL", "llama3.2:1b")
 OLLAMA_EXE: str = _env("OLLAMA_EXE", str(REPO_ROOT / "ollama" / "ollama.exe"))
+OLLAMA_TIMEOUT_SECONDS: float = float(_env("OLLAMA_TIMEOUT_SECONDS", "8"))
 
 # Voice reference files (XTTS voice cloning)
 VOICE_DIR: Path = Path(_env("VOICE_DIR", str(REPO_ROOT / "tortoise")))

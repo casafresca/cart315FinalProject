@@ -17,6 +17,7 @@ from tts_cli_config import (
     MODEL_NAME,
     NARRATOR_FILES,
     OLLAMA_EXE,
+    OLLAMA_TIMEOUT_SECONDS,
     get_output_sample_rate,
     resolve_existing_files,
 )
@@ -37,9 +38,25 @@ SYSTEM_PROMPT = (
 def run_ollama(prompt: str) -> str:
     cmd = [OLLAMA_EXE, "run", LLM_MODEL, prompt]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_TIMEOUT_SECONDS,
+        )
     except FileNotFoundError:
-        result = subprocess.run(["ollama", "run", LLM_MODEL, prompt], capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
+        result = subprocess.run(
+            ["ollama", "run", LLM_MODEL, prompt],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_TIMEOUT_SECONDS,
+        )
     return result.stdout.strip()
 
 
@@ -47,11 +64,19 @@ def generate_reply(user_text: str) -> str:
     prompt = f"{SYSTEM_PROMPT}\nPlayer: {user_text}\nNPC:"
     try:
         reply = run_ollama(prompt)
-    except subprocess.CalledProcessError as e:
-        log(f"Ollama failed: {e.stderr.strip()}")
-        return user_text
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"Ollama timed out after {OLLAMA_TIMEOUT_SECONDS:g}s. Is the Ollama app/server running?"
+        ) from exc
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"Ollama executable was not found at '{OLLAMA_EXE}' and was not available on PATH."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        details = (exc.stderr or exc.stdout or str(exc)).strip()
+        raise RuntimeError(f"Ollama failed: {details}") from exc
     if not reply:
-        return user_text
+        raise RuntimeError("Ollama returned an empty reply.")
     return reply.split("\n")[0][:400]
 
 
@@ -116,11 +141,11 @@ def main():
             continue
 
         log(f"Request {request_id}: {user_text}")
-        reply_text = generate_reply(user_text)
-        log(f"Generated reply: {reply_text}")
-        start_time = time.perf_counter()
-
         try:
+            reply_text = generate_reply(user_text)
+            log(f"Generated reply: {reply_text}")
+            start_time = time.perf_counter()
+
             # Generate audio from the Ollama reply
             wav = tts.tts(
                 text=reply_text,

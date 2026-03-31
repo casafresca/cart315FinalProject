@@ -211,6 +211,7 @@ public class TTSRunner : MonoBehaviour
                     yield break;
                 }
 
+                Debug.Log("[TTS] Reply text: " + response.replyText);
                 string fullPath = response.wavPath;
 
                 // ✅ yield OUTSIDE try/catch
@@ -260,7 +261,7 @@ public class TTSRunner : MonoBehaviour
                 try
                 {
                     var response = JsonUtility.FromJson<TTSResponse>(line);
-                    if (response != null && response.type == "result")
+                    if (response != null && (response.type == "result" || response.type == "error"))
                     {
                         resultQueue.Enqueue(line);
                     }
@@ -374,6 +375,7 @@ public class TTSRunner : MonoBehaviour
         public string type;
         public int id;
         public string wavPath;
+        public string replyText;
         public string error;
     }
 }
