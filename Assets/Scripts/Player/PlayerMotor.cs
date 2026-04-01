@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerMotor : MonoBehaviour
 {
@@ -26,6 +27,18 @@ public class PlayerMotor : MonoBehaviour
         controller = GetComponent<CharacterController>();
         spawnPosition = transform.position;
         spawnRotation = transform.rotation;
+
+        if (TherapySessionState.TryConsumeReturnPoint(SceneManager.GetActiveScene().name, out Vector3 returnPosition, out Quaternion returnRotation))
+        {
+            controller.enabled = false;
+            transform.SetPositionAndRotation(returnPosition, returnRotation);
+            controller.enabled = true;
+
+            spawnPosition = returnPosition;
+            spawnRotation = returnRotation;
+
+            Debug.Log("Player returned from therapy room to saved position: " + returnPosition);
+        }
     }
 
     // Update is called once per frame
