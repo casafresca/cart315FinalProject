@@ -17,6 +17,7 @@ from tts_cli_config import (
     MODEL_NAME,
     NARRATOR_FILES,
     OLLAMA_EXE,
+    OLLAMA_PREP_TIMEOUT_SECONDS,
     OLLAMA_TIMEOUT_SECONDS,
     get_output_sample_rate,
     resolve_existing_files,
@@ -40,6 +41,7 @@ def run_ollama(prompt: str) -> str:
     try:
         result = subprocess.run(
             cmd,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             encoding='utf-8',
@@ -50,6 +52,7 @@ def run_ollama(prompt: str) -> str:
     except FileNotFoundError:
         result = subprocess.run(
             ["ollama", "run", LLM_MODEL, prompt],
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             encoding='utf-8',
@@ -58,6 +61,37 @@ def run_ollama(prompt: str) -> str:
             timeout=OLLAMA_TIMEOUT_SECONDS,
         )
     return result.stdout.strip()
+
+
+def ensure_ollama_model() -> None:
+    log(f"Preparing Ollama model: {LLM_MODEL}")
+    cmd = [OLLAMA_EXE, "pull", LLM_MODEL]
+    try:
+        result = subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_PREP_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError:
+        result = subprocess.run(
+            ["ollama", "pull", LLM_MODEL],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_PREP_TIMEOUT_SECONDS,
+        )
+
+    for line in (result.stdout or "").splitlines():
+        if line.strip():
+            log(f"Ollama: {line.strip()}")
 
 
 def generate_reply(user_text: str) -> str:
@@ -84,8 +118,8 @@ def generate_reply(user_text: str) -> str:
 # Initialize TTS
 # -------------------------
 def initialize():
-    # device = "cuda" if torch.cuda.is_available() else "cpu"
-    device = "cpu"  # force CPU for better stability in this version
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # device = "cpu"  # force CPU for better stability in this version
     log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
     log(f"Loading model: {MODEL_NAME}")
     start = time.perf_counter()
@@ -110,6 +144,7 @@ def main():
     out_dir = os.path.abspath(out_dir)
     log(f"Output directory: {out_dir}")
 
+    ensure_ollama_model()
     tts, sample_rate, speaker_wavs = initialize()
 
     # ✅ Send READY to Unity
