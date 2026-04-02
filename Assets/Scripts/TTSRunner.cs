@@ -58,7 +58,15 @@ public class TTSRunner : MonoBehaviour
 
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
         scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv3.py");
-        pythonExe = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
+        wavDir = Path.Combine(ttsRoot, "out");
+        Directory.CreateDirectory(wavDir);
+
+        // Prefer project-local venv Python if available; otherwise keep inspector/path value.
+        string bundledPython = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
+        if (File.Exists(bundledPython))
+        {
+            pythonExe = bundledPython;
+        }
 
         Debug.Log($"[TTS] Root: {ttsRoot}");
         Debug.Log($"[TTS] Script: {scriptPath}");
@@ -101,6 +109,12 @@ public class TTSRunner : MonoBehaviour
     {
         Debug.Log("[TTS] Launching Python process...");
 
+        if (!File.Exists(scriptPath))
+        {
+            Debug.LogError("[TTS] Script not found: " + scriptPath);
+            return;
+        }
+
         Debug.Log($"[TTS] EXE: {pythonExe}");
         Debug.Log($"[TTS] ARGS: -u \"{scriptPath}\" --out-dir \"{wavDir}\"");
         Debug.Log($"[TTS] WorkingDir: {ttsRoot}");
@@ -111,7 +125,7 @@ public class TTSRunner : MonoBehaviour
         var psi = new ProcessStartInfo
         {
             FileName = pythonExe,
-            Arguments = $"-u \"{scriptPath}\"",
+            Arguments = $"-u \"{scriptPath}\" --out-dir \"{wavDir}\"",
             WorkingDirectory = ttsRoot,
 
             UseShellExecute = false,
@@ -135,9 +149,16 @@ public class TTSRunner : MonoBehaviour
                 stderrQueue.Enqueue(e.Data);
         };
 
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
+        try
+        {
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("[TTS] Failed to start Python process: " + ex.Message);
+        }
     }
 
     void StopPython()
@@ -379,3 +400,5 @@ public class TTSRunner : MonoBehaviour
         public string error;
     }
 }
+
+
