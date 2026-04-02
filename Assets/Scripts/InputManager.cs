@@ -22,13 +22,16 @@ public class InputManager : MonoBehaviour
 
         // Wrap the actions in a check for the DialogueManager state
         onFoot.Jump.performed += ctx => {
-            if (!DialogueManager.GetInstance().dialogueIsPlaying) motor.Jump();
+            DialogueManager dialogueManager = DialogueManager.GetInstance();
+            if (dialogueManager == null || !dialogueManager.dialogueIsPlaying) motor.Jump();
         };
         onFoot.Crouch.performed += ctx => {
-            if (!DialogueManager.GetInstance().dialogueIsPlaying) motor.Crouch();
+            DialogueManager dialogueManager = DialogueManager.GetInstance();
+            if (dialogueManager == null || !dialogueManager.dialogueIsPlaying) motor.Crouch();
         };
         onFoot.Sprint.performed += ctx => {
-            if (!DialogueManager.GetInstance().dialogueIsPlaying) motor.Sprint();
+            DialogueManager dialogueManager = DialogueManager.GetInstance();
+            if (dialogueManager == null || !dialogueManager.dialogueIsPlaying) motor.Sprint();
         };
     }
 
@@ -36,7 +39,8 @@ public class InputManager : MonoBehaviour
     void FixedUpdate()
     {
         // Only move if dialogue is not playing
-        if (!DialogueManager.GetInstance().dialogueIsPlaying)
+        DialogueManager dialogueManager = DialogueManager.GetInstance();
+        if (dialogueManager == null || !dialogueManager.dialogueIsPlaying)
         {
             motor.ProcessMove(onFoot.Movement.ReadValue<Vector2>());
         }

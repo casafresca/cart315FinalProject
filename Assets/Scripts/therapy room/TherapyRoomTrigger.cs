@@ -114,6 +114,21 @@ public class TherapyRoomTrigger : MonoBehaviour
             doorOpener.CloseDoor();
         }
 
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            TherapySessionState.SetReturnPoint(
+                SceneManager.GetActiveScene().name,
+                player.transform.position,
+                player.transform.rotation);
+
+            Debug.Log("Saved therapy return point at: " + player.transform.position);
+        }
+        else
+        {
+            Debug.LogWarning("TherapyRoomTrigger: Player was not found, so no return point was saved.");
+        }
+
         Debug.Log("Loading therapy room scene..."+therapySceneName);
         SceneManager.LoadScene(therapySceneName);
     }

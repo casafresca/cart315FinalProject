@@ -25,7 +25,8 @@ public class PlayerInteract : MonoBehaviour
     void Update()
     {
         // 1. If dialogue is playing, clear the UI and stop looking for interactables
-        if (DialogueManager.GetInstance().dialogueIsPlaying)
+        DialogueManager dialogueManager = DialogueManager.GetInstance();
+        if (dialogueManager != null && dialogueManager.dialogueIsPlaying)
         {
             playerUI.UpdateText(string.Empty);
             return;
@@ -39,8 +40,14 @@ public class PlayerInteract : MonoBehaviour
 
         if (Physics.Raycast(ray, out hitInfo, interactRange, mask))
         {
-            // 2. Try to get the Interactable component
-            if (hitInfo.collider.TryGetComponent(out Interactable interactable))
+            // 2. Try to get the Interactable component from the hit object or its parent.
+            Interactable interactable = hitInfo.collider.GetComponent<Interactable>();
+            if (interactable == null)
+            {
+                interactable = hitInfo.collider.GetComponentInParent<Interactable>();
+            }
+
+            if (interactable != null)
             {
                 // 3. If this is an NPC and they are already following, DO NOT show text
                 if (interactable is NPC npc && npc.isFollowing)
@@ -50,8 +57,9 @@ public class PlayerInteract : MonoBehaviour
 
                 // 4. Otherwise, show the prompt and allow interaction
                 playerUI.UpdateText(interactable.promptMessage);
-                if (inputManager.onFoot.Interact.triggered)
+                if (inputManager.onFoot.Interact.WasPressedThisFrame())
                 {
+                    Debug.Log($"Interact pressed on: {interactable.name}");
                     interactable.BasseInteract();
                 }
             }

@@ -46,10 +46,30 @@ public class DialogueManager : MonoBehaviour
         dialoguePanel.SetActive(false);
     }
 
+    private void OnDestroy()
+    {
+        if (instance == this)
+        {
+            instance = null;
+        }
+    }
+
     public static DialogueManager GetInstance() => instance;
 
     public void EnterDialogueMode(TextAsset inkJSON, NPC npc)
     {
+        if (inkJSON == null)
+        {
+            Debug.LogError("DialogueManager: Cannot enter dialogue mode because inkJSON is missing.");
+            return;
+        }
+
+        if (npc == null)
+        {
+            Debug.LogError("DialogueManager: Cannot enter dialogue mode because NPC reference is missing.");
+            return;
+        }
+
         currentNPC = npc;
         npcPoints = 0;
         dialogueRounds = 0;
@@ -157,11 +177,13 @@ public class DialogueManager : MonoBehaviour
 
         if (npcPoints >= 3)
         {
+            Debug.Log($"NPC dialogue result: SUCCESS ({npcPoints}/3). NPC should follow now.");
             if (audioSource != null && successSound != null) audioSource.PlayOneShot(successSound);
             currentNPC.StartFollowing();
         }
         else
         {
+            Debug.Log($"NPC dialogue result: FAIL ({npcPoints}/3). NPC resumes combat.");
             if (audioSource != null && failureSound != null) audioSource.PlayOneShot(failureSound);
             currentNPC.ResumeCombat();
         }
