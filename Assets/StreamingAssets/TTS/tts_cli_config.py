@@ -38,6 +38,14 @@ NARRATOR_FILES: List[Path] = [
 
 VOICE_MAP: Dict[str, List[Path]] = {
     "narrator": NARRATOR_FILES,
+    "soldier": NARRATOR_FILES,
+    "player": NARRATOR_FILES,
+    "mad_god": [
+        voice("pat2", "00100.mp3"),
+        voice("pat2", "00112.mp3"),
+        voice("pat2", "00130.mp3"),
+        voice("pat2", "00159.mp3"),
+    ],
     "merchant": [
         voice("train_lescault", "lescault_new1.wav"),
         voice("train_lescault", "lescault_new2.wav"),

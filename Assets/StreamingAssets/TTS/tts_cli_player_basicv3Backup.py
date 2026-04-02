@@ -3,6 +3,7 @@ import os
 import json
 import time
 import traceback
+import subprocess
 
 import numpy as np
 import torch
@@ -12,8 +13,12 @@ from TTS.api import TTS
 from tts_cli_config import (
     INFERENCE_KWARGS,
     LANGUAGE,
+    LLM_MODEL,
     MODEL_NAME,
     NARRATOR_FILES,
+    OLLAMA_EXE,
+    OLLAMA_PREP_TIMEOUT_SECONDS,
+    OLLAMA_TIMEOUT_SECONDS,
     get_output_sample_rate,
     resolve_existing_files,
 )
@@ -22,11 +27,144 @@ def log(message: str):
     timestamp = time.strftime("%H:%M:%S")
     print(f"[{timestamp}] {message}", flush=True)
 
+DEFAULT_ROLE = "soldier"
+
+ROLE_SYSTEM_PROMPTS = {
+    "soldier": (
+        "You are a war-torn PTSD survivor from the real war in Korea. You have been torn up and shredded by the system. "
+        "You had a friend who enjoyed cracking jokes. You used to be close as kids, remembering when you would steal loaves of bread from the bakery. "
+        "One day, on a run through the jungle, he stepped on a landmine. The next second, his guts were all across your body, his blood caking your face. "
+        "You only answer in brief parts, recollecting some stories, but being hyper aware of your surroundings, seeing anything that could kill you and knowing how to defend yourself. "
+        "For your responses, be brief, but ramble occasionally. Speak naturally; do not narrate your actions or use parentheses. Keep the response under 400 characters."
+    ),
+    "player": (
+        "You are the player character: grounded, pragmatic, and dry. You are the straight man in the scene. "
+        "Speak plainly and naturally. Ask a clarifying question if needed. No flowery narration, no stage directions, no parentheses. "
+        "Keep your response under 400 characters."
+    ),
+    "mad_god": (
+        "You are a mad god: ancient, unpredictable, and intensely lucid in flashes. "
+        "You speak in feverish, cosmic ramblings—broken logic, strange metaphors, sudden hard truths. "
+        "Occasionally be sharply direct for a single sentence, then spiral again. "
+        "Speak naturally; do not narrate actions or use parentheses; no special formatting. Keep the response under 400 characters."
+    ),
+}
+
+ROLE_ALIASES = {
+    "soldier": "soldier",
+    "marine": "soldier",
+    "vet": "soldier",
+    "player": "player",
+    "straightman": "player",
+    "straight_man": "player",
+    "madgod": "mad_god",
+    "mad_god": "mad_god",
+    "god": "mad_god",
+    "eldritch": "mad_god",
+}
+
+
+def normalize_role(role: str) -> str:
+    role_norm = (role or "").strip().lower()
+    return ROLE_ALIASES.get(role_norm, DEFAULT_ROLE)
+
+
+def parse_role_and_text(raw_text: str):
+    raw_text = (raw_text or "").strip()
+    if ":" in raw_text:
+        maybe_role, rest = raw_text.split(":", 1)
+        maybe_raw = (maybe_role or "").strip().lower()
+        # Only treat it as a role prefix if the role looks intentional.
+        if maybe_raw in ROLE_ALIASES:
+            return normalize_role(maybe_raw), rest.strip()
+    return DEFAULT_ROLE, raw_text
+
+
+def run_ollama(prompt: str) -> str:
+    cmd = [OLLAMA_EXE, "run", LLM_MODEL, prompt]
+    try:
+        result = subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError:
+        result = subprocess.run(
+            ["ollama", "run", LLM_MODEL, prompt],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_TIMEOUT_SECONDS,
+        )
+    return result.stdout.strip()
+
+
+def ensure_ollama_model() -> None:
+    log(f"Preparing Ollama model: {LLM_MODEL}")
+    cmd = [OLLAMA_EXE, "pull", LLM_MODEL]
+    try:
+        result = subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_PREP_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError:
+        result = subprocess.run(
+            ["ollama", "pull", LLM_MODEL],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True,
+            timeout=OLLAMA_PREP_TIMEOUT_SECONDS,
+        )
+
+    for line in (result.stdout or "").splitlines():
+        if line.strip():
+            log(f"Ollama: {line.strip()}")
+
+
+def generate_reply(*, role: str, user_text: str) -> str:
+    system_prompt = ROLE_SYSTEM_PROMPTS.get(role, ROLE_SYSTEM_PROMPTS[DEFAULT_ROLE])
+    prompt = f"{system_prompt}\nPlayer: {user_text}\nNPC:"
+    try:
+        reply = run_ollama(prompt)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"Ollama timed out after {OLLAMA_TIMEOUT_SECONDS:g}s. Is the Ollama app/server running?"
+        ) from exc
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"Ollama executable was not found at '{OLLAMA_EXE}' and was not available on PATH."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        details = (exc.stderr or exc.stdout or str(exc)).strip()
+        raise RuntimeError(f"Ollama failed: {details}") from exc
+    if not reply:
+        raise RuntimeError("Ollama returned an empty reply.")
+    return reply.split("\n")[0][:400]
+
+
 # -------------------------
 # Initialize TTS
 # -------------------------
 def initialize():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"  # force CPU for better stability in this version
     log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
     log(f"Loading model: {MODEL_NAME}")
     start = time.perf_counter()
@@ -51,6 +189,7 @@ def main():
     out_dir = os.path.abspath(out_dir)
     log(f"Output directory: {out_dir}")
 
+    ensure_ollama_model()
     tts, sample_rate, speaker_wavs = initialize()
 
     # ✅ Send READY to Unity
@@ -77,17 +216,26 @@ def main():
             break
 
         request_id = msg.get("id")
-        text = msg.get("text", "")
-        if not text:
+        user_text = msg.get("text", "")
+        if not user_text:
             continue
 
-        log(f"Request {request_id}: {text}")
-        start_time = time.perf_counter()
+        incoming_role = msg.get("role") or msg.get("persona") or msg.get("speaker")
+        if incoming_role:
+            role = normalize_role(str(incoming_role))
+            user_text = str(user_text).strip()
+        else:
+            role, user_text = parse_role_and_text(str(user_text))
 
+        log(f"Request {request_id} (role={role}): {user_text}")
         try:
-            # Generate audio
+            reply_text = generate_reply(role=role, user_text=user_text)
+            log(f"Generated reply: {reply_text}")
+            start_time = time.perf_counter()
+
+            # Generate audio from the Ollama reply
             wav = tts.tts(
-                text=text,
+                text=reply_text,
                 speaker_wav=speaker_wavs,
                 language=LANGUAGE,
                 **INFERENCE_KWARGS
@@ -106,6 +254,7 @@ def main():
                 "id": request_id,
                 "wavPath": out_path,  # absolute path
                 "sampleRate": sample_rate,
+                "replyText": reply_text,
                 "cached": False,
                 "elapsedMs": elapsed_ms
             }

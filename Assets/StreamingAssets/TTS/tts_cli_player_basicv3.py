@@ -30,6 +30,7 @@ from tts_cli_config import (
     RAG_RANDOM_SEED,
     RAG_RESEARCH_DIR,
     RAG_TOP_K,
+    VOICE_MAP,
     get_output_sample_rate,
     resolve_existing_files,
 )
@@ -39,12 +40,57 @@ def log(message: str):
     timestamp = time.strftime("%H:%M:%S")
     print(f"[{timestamp}] {message}", flush=True)
 
+DEFAULT_ROLE = "soldier"
 
-SYSTEM_PROMPT = (
-    "You are a war-torn PTSD survivor from the Korean War era. Speak in brief, emotionally grounded lines. "
-    "You carry fragmented memories, fear responses, and moral conflict, but avoid graphic sensationalism. "
-    "Do not provide medical advice. Keep replies under 400 characters and avoid stage directions."
-)
+ROLE_SYSTEM_PROMPTS = {
+    "soldier": (
+        "You are a war-torn PTSD survivor from the real war in Korea. You have been torn up and shredded by the system. "
+        "You had a friend who enjoyed cracking jokes. You used to be close as kids, remembering when you would steal loaves of bread from the bakery. "
+        "One day, on a run through the jungle, he stepped on a landmine. The next second, his guts were all across your body, his blood caking your face. "
+        "You only answer in brief parts, recollecting some stories, but being hyper aware of your surroundings, seeing anything that could kill you and knowing how to defend yourself. "
+        "For your responses, be brief, but ramble occasionally. Speak naturally; do not narrate your actions or use parentheses. Keep the response under 400 characters."
+    ),
+    "player": (
+        "You are the player character: grounded, pragmatic, and dry. You are the straight man in the scene. "
+        "Speak plainly and naturally. Ask a clarifying question if needed. No flowery narration, no stage directions, no parentheses. "
+        "Keep your response under 400 characters."
+    ),
+    "mad_god": (
+        "You are a mad god: ancient, unpredictable, and intensely lucid in flashes. "
+        "You speak in feverish, cosmic ramblings—broken logic, strange metaphors, sudden hard truths. "
+        "Occasionally be sharply direct for a single sentence, then spiral again. "
+        "Speak naturally; do not narrate actions or use parentheses; no special formatting. Keep the response under 400 characters."
+    ),
+}
+
+ROLE_ALIASES = {
+    "soldier": "soldier",
+    "marine": "soldier",
+    "vet": "soldier",
+    "player": "player",
+    "straightman": "player",
+    "straight_man": "player",
+    "madgod": "mad_god",
+    "mad_god": "mad_god",
+    "god": "mad_god",
+    "eldritch": "mad_god",
+}
+
+
+def normalize_role(role: str) -> str:
+    role_norm = (role or "").strip().lower()
+    return ROLE_ALIASES.get(role_norm, DEFAULT_ROLE)
+
+
+def parse_role_and_text(raw_text: str):
+    raw_text = (raw_text or "").strip()
+    if ":" in raw_text:
+        maybe_role, rest = raw_text.split(":", 1)
+        maybe_raw = (maybe_role or "").strip().lower()
+        # Only treat it as a role prefix if the role looks intentional.
+        if maybe_raw in ROLE_ALIASES:
+            return normalize_role(maybe_raw), rest.strip()
+    return DEFAULT_ROLE, raw_text
 
 
 rag_engine = None
@@ -150,6 +196,12 @@ def initialize():
     return tts, sample_rate, speaker_wavs
 
 
+def resolve_role_speaker_wavs(role: str):
+    role_paths = VOICE_MAP.get(role)
+    if role_paths:
+        return resolve_existing_files(role_paths, fallback=NARRATOR_FILES)
+    return resolve_existing_files(NARRATOR_FILES)
+
 # -------------------------
 # Main server loop
 # -------------------------
@@ -211,15 +263,24 @@ def main():
         if not user_text:
             continue
 
-        log(f"Request {request_id}: {user_text}")
+        incoming_role = msg.get("role") or msg.get("persona") or msg.get("speaker")
+        if incoming_role:
+            role = normalize_role(str(incoming_role))
+            user_text = str(user_text).strip()
+        else:
+            role, user_text = parse_role_and_text(str(user_text))
+
+        log(f"Request {request_id} (role={role}): {user_text}")
         try:
-            reply_text = generate_reply(user_text)
+            reply_text = generate_reply(role=role, user_text=user_text)
             log(f"Generated reply: {reply_text}")
             start_time = time.perf_counter()
 
+            # Generate audio from the Ollama reply
+            role_speaker_wavs = resolve_role_speaker_wavs(role)
             wav = tts.tts(
                 text=reply_text,
-                speaker_wav=speaker_wavs,
+                speaker_wav=role_speaker_wavs,
                 language=LANGUAGE,
                 **INFERENCE_KWARGS,
             )
