@@ -68,6 +68,9 @@ public class NPCShoot : MonoBehaviour
         }
 
         // Cleanup bullet if it flies into the void
+
+        // First shot after vulnerable state cancels flicker (combat resumed).
+        npc.NotifyFiredAgain();
         Destroy(bulletObj, 5f);
     }
 }

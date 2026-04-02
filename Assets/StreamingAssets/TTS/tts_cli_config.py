@@ -85,3 +85,15 @@ def resolve_existing_files(
 def get_output_sample_rate(tts, default: int = 24000) -> int:
     return int(getattr(getattr(tts, "synthesizer", None), "output_sample_rate", default))
 
+
+# RAG / research-memory settings
+RAG_ENABLED: bool = _env("RAG_ENABLED", "true").lower() in {"1", "true", "yes", "y"}
+RAG_TOP_K: int = int(_env("RAG_TOP_K", "4"))
+RAG_CHUNK_CHARS: int = int(_env("RAG_CHUNK_CHARS", "500"))
+RAG_CHUNK_OVERLAP: int = int(_env("RAG_CHUNK_OVERLAP", "80"))
+RAG_MIN_CHUNK_CHARS: int = int(_env("RAG_MIN_CHUNK_CHARS", "120"))
+RAG_GLITCH_PROBABILITY: float = float(_env("RAG_GLITCH_PROBABILITY", "0.20"))
+RAG_CONTRADICTION_PROBABILITY: float = float(_env("RAG_CONTRADICTION_PROBABILITY", "0.12"))
+RAG_RANDOM_SEED: int = int(_env("RAG_RANDOM_SEED", "42"))
+RAG_RESEARCH_DIR: Path = Path(_env("RAG_RESEARCH_DIR", str(REPO_ROOT.parent.parent / "Research")))
+RAG_CACHE_DIR: Path = Path(_env("RAG_CACHE_DIR", str(REPO_ROOT / ".cache" / "rag")))
