@@ -167,7 +167,7 @@ public class TTSRunner : MonoBehaviour
 
         int id = nextId++;
 
-        string json = $"{{\"id\":{id},\"text\":\"{Escape(text)}\"}}";
+        string json = $"{{\"id\":{id},\"role\":\"soldier\",\"text\":\"{Escape(text)}\"}}";
 
         Debug.Log($"[TTS] Sending: {text}");
         SendJson(json);
