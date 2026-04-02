@@ -17,13 +17,15 @@ public class TTSRunner : MonoBehaviour
 
     [Header("Input")]
     [SerializeField] private KeyCode triggerKey = KeyCode.E;
-    [SerializeField] private string testLine = "Hello from Unity!";
+    [SerializeField] private string testLine = "Hello there";
 
     [Header("Paths")]
     [SerializeField] private string pythonExe = "python"; // Override in inspector if not in PATH
     private string ttsRoot;
     private string scriptPath;
     private string wavDir;
+
+    readonly ConcurrentQueue<string> resultQueue = new ConcurrentQueue<string>();
 
 
     private Process process;
@@ -34,6 +36,9 @@ public class TTSRunner : MonoBehaviour
     private bool isReady = false;
     private int nextId = 1;
     private bool isSpeaking = false;
+
+    [Header("Timing")]
+    [SerializeField] private float requestTimeoutSeconds = 120f;
 
     private int sampleRate = 24000;
 
@@ -49,7 +54,7 @@ public class TTSRunner : MonoBehaviour
     void Start()
     {
 
-        Debug.Log("[TTS] Start() called");
+        Debug.Log("[TTS] Start()");
 
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
         scriptPath = Path.Combine(ttsRoot, "tts_cli_player_basicv3.py");
@@ -169,11 +174,12 @@ public class TTSRunner : MonoBehaviour
         Debug.Log($"[TTS] Sending: {text}");
         SendJson(json);
 
-        float timeout = Time.time + 30f;
+        float timeout = Time.time + requestTimeoutSeconds;
+        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for Python response...");
 
         while (Time.time < timeout)
         {
-            while (stdoutQueue.TryDequeue(out string line))
+            while (resultQueue.TryDequeue(out string line))
             {
                 Debug.Log("[PY STDOUT] " + line);
 
@@ -181,7 +187,9 @@ public class TTSRunner : MonoBehaviour
 
                 if (!line.Contains("\"type\"")) continue;
 
-                TTSResponse response = null;
+                TTSResponse response;
+
+                Debug.Log($"[TTS] Processing response for ID {id}...");
 
                 try
                 {
@@ -193,7 +201,10 @@ public class TTSRunner : MonoBehaviour
                 }
 
                 if (response == null || response.id != id)
+                {
+                    Debug.LogWarning("[TTS] Ignoring unrelated message: " + line);
                     continue;
+                }
 
                 if (response.type == "error")
                 {
@@ -202,6 +213,7 @@ public class TTSRunner : MonoBehaviour
                     yield break;
                 }
 
+                Debug.Log("[TTS] Reply text: " + response.replyText);
                 string fullPath = response.wavPath;
 
                 // ✅ yield OUTSIDE try/catch
@@ -211,7 +223,7 @@ public class TTSRunner : MonoBehaviour
                 yield break;
             }
 
-            DrainStderr();
+            DrainQueues();
 
             yield return null;
         }
@@ -240,7 +252,24 @@ public class TTSRunner : MonoBehaviour
         while (stdoutQueue.TryDequeue(out string line))
         {
             Debug.Log("[PY STDOUT] " + line);
-            TryHandleReady(line);
+
+            // Try READY first
+            if (TryHandleReady(line))
+                continue;
+
+            // If it's a result message, store it for SpeakRoutine
+            if (line.Contains("\"type\""))
+            {
+                try
+                {
+                    var response = JsonUtility.FromJson<TTSResponse>(line);
+                    if (response != null && (response.type == "result" || response.type == "error"))
+                    {
+                        resultQueue.Enqueue(line);
+                    }
+                }
+                catch { }
+            }
         }
 
         DrainStderr();
@@ -312,6 +341,19 @@ public class TTSRunner : MonoBehaviour
             yield return null;
 
         Debug.Log("[TTS] Playback finished");
+
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+                Debug.Log("[TTS] Deleted temp WAV: " + path);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[TTS] Failed to delete WAV: " + ex.Message);
+        }
     }
 
     string Escape(string s)
@@ -335,6 +377,7 @@ public class TTSRunner : MonoBehaviour
         public string type;
         public int id;
         public string wavPath;
+        public string replyText;
         public string error;
     }
 }
