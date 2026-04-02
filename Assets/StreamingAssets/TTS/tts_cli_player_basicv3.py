@@ -154,12 +154,17 @@ def ensure_ollama_model() -> None:
             log(f"Ollama: {line.strip()}")
 
 
-def generate_reply(user_text: str) -> str:
+def generate_reply(*, role: str, user_text: str) -> str:
     memory_context = ""
     if rag_engine is not None:
         memory_context = rag_engine.build_prompt_context(user_text)
+        log(f"RAG memory context:\n{memory_context}")
 
-    prompt = f"{SYSTEM_PROMPT}\n{memory_context}\nPlayer: {user_text}\nNPC:"
+    prompt = ""
+    if (prompt == "soldier"):
+        prompt = f"{ROLE_SYSTEM_PROMPTS['soldier']}\n{memory_context}\nPlayer: {user_text}\nSoldier:"
+    else:
+        prompt = ROLE_SYSTEM_PROMPTS.get(role, ROLE_SYSTEM_PROMPTS[DEFAULT_ROLE])
     try:
         reply = run_ollama(prompt)
     except subprocess.TimeoutExpired as exc:
