@@ -2,14 +2,17 @@ using UnityEngine;
 
 public class PlayerInteract : MonoBehaviour
 {
-
     private Camera cam;
-    
+
     [SerializeField]
     private float interactRange = 3f;
 
     [SerializeField]
     private LayerMask mask;
+
+    [Header("Interaction Key (Temporary Debug)")]
+    [SerializeField] private KeyCode interactKey = KeyCode.F;
+
     private PlayerUI playerUI;
     private InputManager inputManager;
 
@@ -55,9 +58,10 @@ public class PlayerInteract : MonoBehaviour
                     return; // Skip showing the prompt message
                 }
 
-                // 4. Otherwise, show the prompt and allow interaction
+                // 4. Otherwise, show the prompt and allow interaction.
+                // TEMP DEBUG: use F to test if E conflicts with TTS input.
                 playerUI.UpdateText(interactable.promptMessage);
-                if (inputManager.onFoot.Interact.WasPressedThisFrame())
+                if (Input.GetKeyDown(interactKey))
                 {
                     Debug.Log($"Interact pressed on: {interactable.name}");
                     interactable.BasseInteract();

@@ -82,7 +82,11 @@ public class NPC : Interactable
     [Tooltip("How much blue can be reached while injured (0-1).")]
     [SerializeField, Range(0f, 1f)] private float injuredBlueMaxBlend = 0.6f;
 
+    [Tooltip("If true, flicker starts when the NPC is staggered (stops shooting) and continues until subdued or combat resumes.")]
+    [SerializeField] private bool persistFlickerAfterHit = true;
+
     private float followingTintBlend;
+    private bool isHitFlickerActive;
 
     [Header("Always Ghost (Optional)")]
     [Tooltip("If true, the NPC keeps a ghostly look all the time.")]
@@ -112,6 +116,7 @@ public class NPC : Interactable
     {
         // Initialize health and start with gun hidden.
         currentHealth = maxHealth;
+        isHitFlickerActive = false;
         if (npcGun != null) npcGun.SetActive(false);
 
         agent = GetComponent<NavMeshAgent>();
@@ -234,6 +239,7 @@ public class NPC : Interactable
 
             isCombatActive = false;
             moveDirection = Vector3.zero;
+            if (persistFlickerAfterHit) isHitFlickerActive = true;
             if (npcGun != null) npcGun.SetActive(false);
             Debug.Log("NPC Staggered. Ready for interaction.");
             return;
@@ -250,6 +256,7 @@ public class NPC : Interactable
         {
             isCombatActive = false;
             moveDirection = Vector3.zero;
+            if (persistFlickerAfterHit) isHitFlickerActive = true;
             if (npcGun != null) npcGun.SetActive(false);
             Debug.Log("NPC Staggered. Ready for interaction.");
         }
@@ -270,6 +277,7 @@ public class NPC : Interactable
         isFollowing = true;
         isCombatActive = false;
         moveDirection = Vector3.zero;
+        isHitFlickerActive = false;
 
         if (npcGun != null) npcGun.SetActive(false);
 
@@ -390,9 +398,11 @@ public class NPC : Interactable
         float healthRatio = maxHealth > 0f ? currentHealth / maxHealth : 1f;
         bool isInjured = healthRatio <= injuredThreshold;
 
-        // Injured pulse applies only before ally/follow state.
+        // Flicker/pulse applies while the NPC is in "hit vulnerability" state and
+        // has not yet become an ally. This lets the effect persist during dialogue.
+        bool shouldPulse = isHitFlickerActive && !isFollowing;
         float alpha = 1f;
-        if (enableInjuredPulse && isInjured && !isFollowing)
+        if (enableInjuredPulse && shouldPulse)
         {
             float pulse01 = (Mathf.Sin(Time.time * injuredPulseSpeed) + 1f) * 0.5f;
             alpha = Mathf.Lerp(injuredMinAlpha, injuredMaxAlpha, pulse01);
@@ -432,6 +442,16 @@ public class NPC : Interactable
         spriteRenderer.color = tint;
     }
 
+
+    /// <summary>
+    /// Called by NPCShoot when this NPC fires again.
+    /// Used to end the vulnerable flicker once combat fully resumes.
+    /// </summary>
+    public void NotifyFiredAgain()
+    {
+        isHitFlickerActive = false;
+    }
+
     private void HandleFollowingLogic()
     {
         // Safety clamp to keep follower from sinking below floor in your scene setup.
@@ -457,6 +477,7 @@ public class NPC : Interactable
         isFollowing = false;
         moveDirection = Vector3.zero;
         currentHealth = 0f;
+        isHitFlickerActive = false;
 
         if (npcGun != null)
         {
@@ -488,3 +509,6 @@ public class NPC : Interactable
         return currentHealth <= (maxHealth * dialogueHealthThreshold) + DialogueThresholdEpsilon;
     }
 }
+
+
+

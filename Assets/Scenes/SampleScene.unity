@@ -417,7 +417,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: 1. Button
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -426,8 +426,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4279375647
+  m_fontColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -444,15 +444,15 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 24
-  m_fontSizeBase: 24
+  m_fontSize: 27
+  m_fontSizeBase: 27
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 2
-  m_VerticalAlignment: 512
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 4096
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -483,7 +483,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 16, y: 0, z: 8, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -617,11 +617,153 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8070291884171197520, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8070291884171197520, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8070291884171197520, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 52226f3216c35c74799ecaed5f1e9953, type: 3}
+--- !u!1 &334520177
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 334520178}
+  - component: {fileID: 334520180}
+  - component: {fileID: 334520179}
+  m_Layer: 0
+  m_Name: DialogueVisualRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &334520178
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 334520177}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 571583269}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &334520179
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 334520177}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cf609f59de256bb4e9784fcad0e2d646, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DialogueLayoutPresetApplier
+  dialoguePanelRect: {fileID: 728585361}
+  notebookBodyRect: {fileID: 0}
+  dialogueTextRect: {fileID: 714554688}
+  choicesContainerRect: {fileID: 1148712441}
+  continueButtonRect: {fileID: 485947666}
+  choiceCardRects:
+  - {fileID: 2063039152}
+  - {fileID: 1027237528}
+  - {fileID: 2096113483}
+  - {fileID: 456920648}
+  panelMinX: 0.05
+  panelMaxX: 0.95
+  panelMinY: 0.05
+  panelMaxY: 0.42
+  bodyInsetX: 0.02
+  bodyInsetY: 0.05
+  dialogueBlockAnchorMin: {x: 0.24, y: 0.56}
+  dialogueBlockAnchorMax: {x: 0.96, y: 0.93}
+  choicesBlockAnchorMin: {x: 0.24, y: 0.14}
+  choicesBlockAnchorMax: {x: 0.96, y: 0.52}
+  continueAnchorMin: {x: 0.76, y: 0.03}
+  continueAnchorMax: {x: 0.96, y: 0.15}
+  autoStackChoices: 1
+  firstCardTop: 0.84
+  cardHeight: 0.2
+  cardVerticalStep: 0.25
+--- !u!114 &334520180
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 334520177}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1968406482612a4ebdf847270e62c2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DialogueThemeStyler
+  dimBackdrop: {fileID: 0}
+  dialoguePanel: {fileID: 728585362}
+  notebookBody: {fileID: 0}
+  polaroidFrame: {fileID: 0}
+  choiceCards:
+  - {fileID: 2063039154}
+  - {fileID: 1027237530}
+  - {fileID: 2096113485}
+  - {fileID: 456920650}
+  notebookPaperSprite: {fileID: 21300000, guid: d67ab5d047c5fa64c8427c371da8ae2f, type: 3}
+  polaroidFrameSprite: {fileID: 21300000, guid: 382020a4203c1ba4ba3b083451e8448c, type: 3}
+  choiceCardSprite: {fileID: 21300000, guid: 36d096cf3c91f794880f4e3a2639423e, type: 3}
+  scratchOverlaySprite: {fileID: 21300000, guid: 9e81e75983451304bb286d59ea1d9a16, type: 3}
+  grainOverlaySprite: {fileID: 21300000, guid: 50ef389b3adf2fe4f835de57ede90279, type: 3}
+  scratchOverlayImage: {fileID: 0}
+  grainOverlayImage: {fileID: 0}
+  scratchOpacity: 0.228
+  grainOpacity: 0.18
+  dialogueText: {fileID: 714554689}
+  choiceTexts:
+  - {fileID: 130074476}
+  - {fileID: 1175393833}
+  - {fileID: 921798206}
+  - {fileID: 1461566218}
+  labelTexts: []
+  dimColor: {r: 0.055, g: 0.039, b: 0.031, a: 0.58}
+  paperBase: {r: 0.8039216, g: 0.72156864, b: 0.6156863, a: 1}
+  paperDark: {r: 0.65882355, g: 0.5568628, b: 0.44705883, a: 1}
+  rustBrown: {r: 0.416, g: 0.294, b: 0.227, a: 1}
+  driedBlood: {r: 0.43137255, g: 0.14901961, b: 0.13725491, a: 1}
+  inkText: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  dialogueFontSize: 32
+  choiceFontSize: 27
+  labelFontSize: 18
+  labelStyle: 16
+  addChoiceNumbers: 1
+  applyCardTilt: 1
+  cardTiltZ:
+  - -1.2
+  - 0.7
+  - -0.8
+  - 1.1
+  applyNow: 0
 --- !u!1 &370859612
 GameObject:
   m_ObjectHideFlags: 0
@@ -873,6 +1015,9 @@ GameObject:
   - component: {fileID: 456920651}
   - component: {fileID: 456920650}
   - component: {fileID: 456920649}
+  - component: {fileID: 456920654}
+  - component: {fileID: 456920653}
+  - component: {fileID: 456920652}
   m_Layer: 5
   m_Name: choice3
   m_TagString: Untagged
@@ -887,7 +1032,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 456920647}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0.009599164, w: 0.9999539}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -956,6 +1101,30 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+      - m_Target: {fileID: 456920654}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 456920654}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &456920650
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -969,14 +1138,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.65882355, g: 0.5568628, b: 0.44705883, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Sprite: {fileID: 21300000, guid: 36d096cf3c91f794880f4e3a2639423e, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -994,6 +1163,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 456920647}
   m_CullTransparentMesh: 1
+--- !u!114 &456920652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 456920647}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.416, g: 0.294, b: 0.227, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &456920653
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 456920647}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee02cc1394dfb1b4b802e30acc9b356e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardAutoReset
+  hoverFX: {fileID: 0}
+  button: {fileID: 0}
+--- !u!114 &456920654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 456920647}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c2f1f13cf826e74eae3264ce46ff6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardHoverFX
+  targetRect: {fileID: 456920648}
+  cardImage: {fileID: 456920650}
+  cardText: {fileID: 1461566218}
+  idleColor: {r: 0.824, g: 0.761, b: 0.659, a: 1}
+  hoverColor: {r: 0.89, g: 0.843, b: 0.765, a: 1}
+  selectedColor: {r: 0.498, g: 0.682, b: 0.82, a: 1}
+  textIdleColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  textHoverColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  hoverScale: 1.03
+  selectedScale: 1.05
+  lerpSpeed: 12
 --- !u!1 &485947665
 GameObject:
   m_ObjectHideFlags: 0
@@ -1358,6 +1579,7 @@ RectTransform:
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 334520178}
   - {fileID: 490861156}
   - {fileID: 2119191243}
   - {fileID: 728585361}
@@ -1505,6 +1727,7 @@ MonoBehaviour:
   mask:
     serializedVersion: 2
     m_Bits: 64
+  interactKey: 102
 --- !u!114 &624925868
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1635,8 +1858,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4279375647
+  m_fontColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1653,8 +1876,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 32
+  m_fontSizeBase: 32
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1692,7 +1915,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 12, y: 6, z: 12, w: 6}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -1759,7 +1982,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.055, g: 0.039, b: 0.031, a: 0.58}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2027,7 +2250,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: 3. Button
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2036,8 +2259,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4279375647
+  m_fontColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -2054,15 +2277,15 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 24
-  m_fontSizeBase: 24
+  m_fontSize: 27
+  m_fontSizeBase: 27
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 2
-  m_VerticalAlignment: 512
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 4096
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -2093,7 +2316,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 16, y: 0, z: 8, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -2150,6 +2373,9 @@ GameObject:
   - component: {fileID: 1027237531}
   - component: {fileID: 1027237530}
   - component: {fileID: 1027237529}
+  - component: {fileID: 1027237534}
+  - component: {fileID: 1027237533}
+  - component: {fileID: 1027237532}
   m_Layer: 5
   m_Name: choice1
   m_TagString: Untagged
@@ -2164,7 +2390,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1027237527}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0.006108614, w: 0.99998134}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -2233,6 +2459,30 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+      - m_Target: {fileID: 1027237534}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 1027237534}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1027237530
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2246,14 +2496,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.65882355, g: 0.5568628, b: 0.44705883, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Sprite: {fileID: 21300000, guid: 36d096cf3c91f794880f4e3a2639423e, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2271,6 +2521,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1027237527}
   m_CullTransparentMesh: 1
+--- !u!114 &1027237532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1027237527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.416, g: 0.294, b: 0.227, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &1027237533
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1027237527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee02cc1394dfb1b4b802e30acc9b356e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardAutoReset
+  hoverFX: {fileID: 0}
+  button: {fileID: 0}
+--- !u!114 &1027237534
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1027237527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c2f1f13cf826e74eae3264ce46ff6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardHoverFX
+  targetRect: {fileID: 1027237528}
+  cardImage: {fileID: 1027237530}
+  cardText: {fileID: 1175393833}
+  idleColor: {r: 0.824, g: 0.761, b: 0.659, a: 1}
+  hoverColor: {r: 0.89, g: 0.843, b: 0.765, a: 1}
+  selectedColor: {r: 0.498, g: 0.682, b: 0.82, a: 1}
+  textIdleColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  textHoverColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  hoverScale: 1.03
+  selectedScale: 1.05
+  lerpSpeed: 12
 --- !u!1 &1122900116
 GameObject:
   m_ObjectHideFlags: 0
@@ -2543,7 +2845,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: 2. Button
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2552,8 +2854,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4279375647
+  m_fontColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -2570,15 +2872,15 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 24
-  m_fontSizeBase: 24
+  m_fontSize: 27
+  m_fontSizeBase: 27
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 2
-  m_VerticalAlignment: 512
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 4096
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -2609,7 +2911,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 16, y: 0, z: 8, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -2797,7 +3099,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Button
+  m_text: 4. Button
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2806,8 +3108,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4281479730
-  m_fontColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+    rgba: 4279375647
+  m_fontColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -2824,15 +3126,15 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 24
-  m_fontSizeBase: 24
+  m_fontSize: 27
+  m_fontSizeBase: 27
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 2
-  m_VerticalAlignment: 512
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 4096
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -2863,7 +3165,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 16, y: 0, z: 8, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -3544,6 +3846,8 @@ MonoBehaviour:
   currentHealth: 0
   npcGun: {fileID: 1658613632}
   becomeHostileWhenShot: 1
+  dialogueHealthThreshold: 0.3
+  preventDeathBeforeDialogue: 1
   spriteRenderer: {fileID: 0}
   idleSprite: {fileID: 21300000, guid: e48be5ff34250e84a90721c5004aad53, type: 3}
   attackSprite: {fileID: 21300000, guid: 6568190b79931bb41936fd7b4836b9d6, type: 3}
@@ -3562,6 +3866,7 @@ MonoBehaviour:
   blueWhenInjured: 1
   injuredBlueFluctuationSpeed: 1.2
   injuredBlueMaxBlend: 0.6
+  persistFlickerAfterHit: 1
   alwaysGhost: 0
   alwaysGhostBaseTint: {r: 0.82, g: 0.76, b: 0.7, a: 1}
   alwaysGhostBaseAlpha: 0.78
@@ -3940,6 +4245,9 @@ GameObject:
   - component: {fileID: 2063039155}
   - component: {fileID: 2063039154}
   - component: {fileID: 2063039153}
+  - component: {fileID: 2063039158}
+  - component: {fileID: 2063039157}
+  - component: {fileID: 2063039156}
   m_Layer: 5
   m_Name: choice0
   m_TagString: Untagged
@@ -3954,7 +4262,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2063039151}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: -0.010471784, w: 0.99994516}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -4023,6 +4331,30 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+      - m_Target: {fileID: 2063039158}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 2063039158}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &2063039154
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4036,14 +4368,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.8039216, g: 0.72156864, b: 0.6156863, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Sprite: {fileID: 21300000, guid: 36d096cf3c91f794880f4e3a2639423e, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4061,6 +4393,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2063039151}
   m_CullTransparentMesh: 1
+--- !u!114 &2063039156
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2063039151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.416, g: 0.294, b: 0.227, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &2063039157
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2063039151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee02cc1394dfb1b4b802e30acc9b356e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardAutoReset
+  hoverFX: {fileID: 0}
+  button: {fileID: 0}
+--- !u!114 &2063039158
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2063039151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c2f1f13cf826e74eae3264ce46ff6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardHoverFX
+  targetRect: {fileID: 2063039152}
+  cardImage: {fileID: 2063039154}
+  cardText: {fileID: 130074476}
+  idleColor: {r: 0.824, g: 0.761, b: 0.659, a: 1}
+  hoverColor: {r: 0.89, g: 0.843, b: 0.765, a: 1}
+  selectedColor: {r: 0.498, g: 0.682, b: 0.82, a: 1}
+  textIdleColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  textHoverColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  hoverScale: 1.03
+  selectedScale: 1.05
+  lerpSpeed: 12
 --- !u!1 &2096113482
 GameObject:
   m_ObjectHideFlags: 0
@@ -4073,6 +4457,9 @@ GameObject:
   - component: {fileID: 2096113486}
   - component: {fileID: 2096113485}
   - component: {fileID: 2096113484}
+  - component: {fileID: 2096113489}
+  - component: {fileID: 2096113488}
+  - component: {fileID: 2096113487}
   m_Layer: 5
   m_Name: choice2
   m_TagString: Untagged
@@ -4087,7 +4474,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2096113482}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: -0.00698126, w: 0.9999756}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -4156,6 +4543,30 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+      - m_Target: {fileID: 2096113489}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 2096113489}
+        m_TargetAssemblyTypeName: ChoiceCardHoverFX, Assembly-CSharp
+        m_MethodName: SetSelectedVisual
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &2096113485
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4169,14 +4580,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.8039216, g: 0.72156864, b: 0.6156863, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Sprite: {fileID: 21300000, guid: 36d096cf3c91f794880f4e3a2639423e, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4194,6 +4605,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2096113482}
   m_CullTransparentMesh: 1
+--- !u!114 &2096113487
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2096113482}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.416, g: 0.294, b: 0.227, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
+--- !u!114 &2096113488
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2096113482}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee02cc1394dfb1b4b802e30acc9b356e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardAutoReset
+  hoverFX: {fileID: 0}
+  button: {fileID: 0}
+--- !u!114 &2096113489
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2096113482}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c2f1f13cf826e74eae3264ce46ff6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChoiceCardHoverFX
+  targetRect: {fileID: 2096113483}
+  cardImage: {fileID: 2096113485}
+  cardText: {fileID: 921798206}
+  idleColor: {r: 0.824, g: 0.761, b: 0.659, a: 1}
+  hoverColor: {r: 0.89, g: 0.843, b: 0.765, a: 1}
+  selectedColor: {r: 0.498, g: 0.682, b: 0.82, a: 1}
+  textIdleColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  textHoverColor: {r: 0.122, g: 0.09, b: 0.071, a: 1}
+  hoverScale: 1.03
+  selectedScale: 1.05
+  lerpSpeed: 12
 --- !u!1 &2119191242
 GameObject:
   m_ObjectHideFlags: 0
