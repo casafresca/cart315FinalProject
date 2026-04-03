@@ -9,7 +9,7 @@ using Debug = UnityEngine.Debug;
 
 public class TTSRunner : MonoBehaviour
 {
-    // ✅ GLOBAL ACCESS
+    // GLOBAL ACCESS
     public static TTSRunner Instance;
 
     [Header("Audio")]
@@ -25,8 +25,15 @@ public class TTSRunner : MonoBehaviour
     private string scriptPath;
     private string wavDir;
 
-    readonly ConcurrentQueue<string> resultQueue = new ConcurrentQueue<string>();
+    [Header("AI Speed Mode")]
+    [Tooltip("When enabled, use shorter AI replies and fewer voice references for faster response time.")]
+    [SerializeField] private bool fastReplyMode = true;
+    [SerializeField] private int fastReplyMaxChars = 220;
+    [SerializeField] private int normalReplyMaxChars = 400;
+    [SerializeField] private int fastMaxSpeakerReferences = 1;
+    [SerializeField] private int normalMaxSpeakerReferences = 2;
 
+    readonly ConcurrentQueue<string> resultQueue = new ConcurrentQueue<string>();
 
     private Process process;
 
@@ -36,6 +43,10 @@ public class TTSRunner : MonoBehaviour
     private bool isReady = false;
     private int nextId = 1;
     private bool isSpeaking = false;
+
+    // Read-only state exposed for other gameplay visuals (e.g., talking sprites).
+    public bool IsSpeaking => isSpeaking;
+    public bool IsReady => isReady;
 
     [Header("Timing")]
     [SerializeField] private float requestTimeoutSeconds = 120f;
@@ -47,13 +58,20 @@ public class TTSRunner : MonoBehaviour
     // -------------------------
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+
         if (!audioSource)
             audioSource = gameObject.AddComponent<AudioSource>();
     }
 
     void Start()
     {
-
         Debug.Log("[TTS] Start()");
 
         ttsRoot = Path.Combine(Application.streamingAssetsPath, "TTS");
@@ -99,6 +117,11 @@ public class TTSRunner : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+
         StopPython();
     }
 
@@ -135,6 +158,8 @@ public class TTSRunner : MonoBehaviour
             CreateNoWindow = true
         };
 
+        ApplyRuntimeAiEnv(psi);
+
         process = new Process { StartInfo = psi };
 
         process.OutputDataReceived += (_, e) =>
@@ -161,6 +186,30 @@ public class TTSRunner : MonoBehaviour
         }
     }
 
+    private void ApplyRuntimeAiEnv(ProcessStartInfo psi)
+    {
+        string fastEnabled = fastReplyMode ? "true" : "false";
+        string fastChars = Mathf.Max(80, fastReplyMaxChars).ToString();
+        string normalChars = Mathf.Max(120, normalReplyMaxChars).ToString();
+        int refs = Mathf.Max(1, fastReplyMode ? fastMaxSpeakerReferences : normalMaxSpeakerReferences);
+
+        psi.EnvironmentVariables["FAST_REPLY_ENABLED"] = fastEnabled;
+        psi.EnvironmentVariables["FAST_REPLY_MAX_CHARS"] = fastChars;
+        psi.EnvironmentVariables["NORMAL_REPLY_MAX_CHARS"] = normalChars;
+        psi.EnvironmentVariables["MAX_SPEAKER_REFERENCES"] = refs.ToString();
+
+        Debug.Log($"[TTS] AI Speed Mode: {(fastReplyMode ? "FAST" : "NORMAL")}, chars={ (fastReplyMode ? fastChars : normalChars) }, refs={refs}");
+    }
+
+    [ContextMenu("Restart Python TTS")]
+    public void RestartPythonProcess()
+    {
+        StopPython();
+        isReady = false;
+        isSpeaking = false;
+        StartPython();
+    }
+
     void StopPython()
     {
         try
@@ -179,16 +228,21 @@ public class TTSRunner : MonoBehaviour
     // -------------------------
     public void Speak(string text)
     {
-        StartCoroutine(SpeakRoutine(text));
+        SpeakAs("soldier", text);
     }
 
-    IEnumerator SpeakRoutine(string text)
+    public void SpeakAs(string role, string text)
+    {
+        StartCoroutine(SpeakRoutine(role, text));
+    }
+
+    IEnumerator SpeakRoutine(string role, string text)
     {
         isSpeaking = true;
 
         int id = nextId++;
-
-        string json = $"{{\"id\":{id},\"role\":\"soldier\",\"text\":\"{Escape(text)}\"}}";
+        string safeRole = string.IsNullOrWhiteSpace(role) ? "soldier" : Escape(role);
+        string json = $"{{\"id\":{id},\"role\":\"{safeRole}\",\"text\":\"{Escape(text)}\"}}";
 
         Debug.Log($"[TTS] Sending: {text}");
         SendJson(json);
@@ -235,7 +289,6 @@ public class TTSRunner : MonoBehaviour
                 Debug.Log("[TTS] Reply text: " + response.replyText);
                 string fullPath = response.wavPath;
 
-                // ✅ yield OUTSIDE try/catch
                 yield return PlayWav(fullPath);
 
                 isSpeaking = false;
@@ -243,7 +296,6 @@ public class TTSRunner : MonoBehaviour
             }
 
             DrainQueues();
-
             yield return null;
         }
 
@@ -400,5 +452,4 @@ public class TTSRunner : MonoBehaviour
         public string error;
     }
 }
-
 
