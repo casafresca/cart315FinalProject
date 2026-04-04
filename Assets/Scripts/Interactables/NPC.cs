@@ -102,6 +102,10 @@ public class NPC : Interactable
     [Tooltip("Strength of the Always Ghost breathing pulse.")]
     [SerializeField, Range(0f, 0.5f)] private float alwaysGhostPulseAmplitude = 0.08f;
 
+    [Header("Optional AI Debate")]
+    [Tooltip("Optional debate battle component. If present and allowed, interaction can start AI conversation battle instead of normal flow.")]
+    [SerializeField] private NPCDebateBattle debateBattle;
+
     [Header("Movement Settings")]
     [SerializeField] private float stoppingDistance = 2.5f;
 
@@ -136,6 +140,11 @@ public class NPC : Interactable
         if (spriteRenderer == null)
         {
             spriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
+        }
+
+        if (debateBattle == null)
+        {
+            debateBattle = GetComponent<NPCDebateBattle>();
         }
 
         nextWalkFrameTime = Time.time;
@@ -316,6 +325,12 @@ public class NPC : Interactable
 
         // Already allied NPC should not re-open dialogue/combat.
         if (isFollowing || isDead) return;
+
+        // Optional branch: AI debate battle sequence (room-based / component-based).
+        if (debateBattle != null && debateBattle.TryStartDebateFromInteract())
+        {
+            return;
+        }
 
         if (IsAtDialogueThreshold())
         {
@@ -509,6 +524,4 @@ public class NPC : Interactable
         return currentHealth <= (maxHealth * dialogueHealthThreshold) + DialogueThresholdEpsilon;
     }
 }
-
-
 

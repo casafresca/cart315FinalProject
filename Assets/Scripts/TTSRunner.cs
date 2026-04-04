@@ -43,10 +43,14 @@ public class TTSRunner : MonoBehaviour
     private bool isReady = false;
     private int nextId = 1;
     private bool isSpeaking = false;
+    private int lastCompletedRequestId;
+    private string lastCompletedReplyText = string.Empty;
 
     // Read-only state exposed for other gameplay visuals (e.g., talking sprites).
     public bool IsSpeaking => isSpeaking;
     public bool IsReady => isReady;
+    public int LastCompletedRequestId => lastCompletedRequestId;
+    public string LastCompletedReplyText => lastCompletedReplyText;
 
     [Header("Timing")]
     [SerializeField] private float requestTimeoutSeconds = 120f;
@@ -287,6 +291,8 @@ public class TTSRunner : MonoBehaviour
                 }
 
                 Debug.Log("[TTS] Reply text: " + response.replyText);
+                lastCompletedRequestId = response.id;
+                lastCompletedReplyText = response.replyText ?? string.Empty;
                 string fullPath = response.wavPath;
 
                 yield return PlayWav(fullPath);

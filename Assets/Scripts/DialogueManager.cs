@@ -2,7 +2,6 @@ using UnityEngine;
 using TMPro;
 using Ink.Runtime;
 using System.Collections.Generic;
-using UnityEngine.UI;
 
 public class DialogueManager : MonoBehaviour
 {
@@ -26,6 +25,7 @@ public class DialogueManager : MonoBehaviour
     [SerializeField] private AudioClip failureSound;
 
     private Story currentStory;
+    private bool externalDialogueSession;
 
     // This is the variable your Weapon script checks
     public bool dialogueIsPlaying { get; private set; }
@@ -41,9 +41,9 @@ public class DialogueManager : MonoBehaviour
         }
         instance = this;
 
-        // --- CRITICAL FIX: Ensure this is false when the game starts ---
         dialogueIsPlaying = false;
-        dialoguePanel.SetActive(false);
+        externalDialogueSession = false;
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
     }
 
     private void OnDestroy()
@@ -55,6 +55,69 @@ public class DialogueManager : MonoBehaviour
     }
 
     public static DialogueManager GetInstance() => instance;
+
+    public bool TryBeginExternalDialogueSession(string openingText)
+    {
+        if (dialogueIsPlaying)
+        {
+            return false;
+        }
+
+        dialogueIsPlaying = true;
+        externalDialogueSession = true;
+
+        if (dialoguePanel != null) dialoguePanel.SetActive(true);
+        if (dialogueText != null) dialogueText.text = openingText ?? string.Empty;
+        if (continueButton != null) continueButton.SetActive(false);
+
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        return true;
+    }
+
+    public void SetExternalDialogueText(string text)
+    {
+        if (!externalDialogueSession || dialogueText == null)
+        {
+            return;
+        }
+
+        dialogueText.text = text ?? string.Empty;
+    }
+
+    public void EndExternalDialogueSession()
+    {
+        if (!externalDialogueSession)
+        {
+            return;
+        }
+
+        externalDialogueSession = false;
+        dialogueIsPlaying = false;
+
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
+        if (dialogueText != null) dialogueText.text = string.Empty;
+        if (continueButton != null) continueButton.SetActive(false);
+
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
 
     public void EnterDialogueMode(TextAsset inkJSON, NPC npc)
     {
@@ -70,6 +133,12 @@ public class DialogueManager : MonoBehaviour
             return;
         }
 
+        if (dialogueIsPlaying)
+        {
+            return;
+        }
+
+        externalDialogueSession = false;
         currentNPC = npc;
         npcPoints = 0;
         dialogueRounds = 0;
@@ -79,9 +148,9 @@ public class DialogueManager : MonoBehaviour
             player.GetComponent<PlayerUI>().UpdateText(string.Empty);
 
         currentStory = new Story(inkJSON.text);
-        dialogueIsPlaying = true; // Block shooting now
-        dialoguePanel.SetActive(true);
-        continueButton.SetActive(false);
+        dialogueIsPlaying = true;
+        if (dialoguePanel != null) dialoguePanel.SetActive(true);
+        if (continueButton != null) continueButton.SetActive(false);
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -91,6 +160,11 @@ public class DialogueManager : MonoBehaviour
 
     public void OnContinuePressed()
     {
+        if (externalDialogueSession || currentStory == null)
+        {
+            return;
+        }
+
         if (currentStory.canContinue)
         {
             ContinueStory();
@@ -103,9 +177,14 @@ public class DialogueManager : MonoBehaviour
 
     private void ContinueStory()
     {
+        if (currentStory == null)
+        {
+            return;
+        }
+
         if (currentStory.canContinue)
         {
-            dialogueText.text = currentStory.Continue();
+            if (dialogueText != null) dialogueText.text = currentStory.Continue();
             DisplayChoices();
 
             if (currentStory.currentChoices.Count > 0)
@@ -123,15 +202,28 @@ public class DialogueManager : MonoBehaviour
 
     private void DisplayChoices()
     {
+        if (currentStory == null)
+        {
+            return;
+        }
+
         List<Choice> currentChoices = currentStory.currentChoices;
-        continueButton.SetActive(currentChoices.Count == 0);
+        if (continueButton != null) continueButton.SetActive(currentChoices.Count == 0);
+
+        if (choices == null)
+        {
+            return;
+        }
 
         for (int i = 0; i < choices.Length; i++)
         {
+            if (choices[i] == null) continue;
+
             if (i < currentChoices.Count)
             {
                 choices[i].gameObject.SetActive(true);
-                choices[i].GetComponentInChildren<TextMeshProUGUI>().text = currentChoices[i].text;
+                TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
+                if (txt != null) txt.text = currentChoices[i].text;
             }
             else
             {
@@ -142,6 +234,26 @@ public class DialogueManager : MonoBehaviour
 
     public void MakeChoice(int choiceIndex)
     {
+        if (externalDialogueSession || currentStory == null)
+        {
+            return;
+        }
+
+        int choiceCount = currentStory.currentChoices.Count;
+        Debug.Log($"DialogueManager.MakeChoice called with index={choiceIndex}, availableChoices={choiceCount}");
+        if (choiceCount <= 0)
+        {
+            Debug.LogWarning("DialogueManager.MakeChoice: No choices available, exiting dialogue mode.");
+            ExitDialogueMode();
+            return;
+        }
+
+        if (choiceIndex < 0 || choiceIndex >= choiceCount)
+        {
+            Debug.LogWarning($"DialogueManager.MakeChoice: Invalid choiceIndex={choiceIndex} for {choiceCount} choices. Falling back to index 0.");
+            choiceIndex = 0;
+        }
+
         if (currentStory.currentChoices[choiceIndex].text == pointWinningText)
         {
             npcPoints++;
@@ -150,9 +262,12 @@ public class DialogueManager : MonoBehaviour
         currentStory.ChooseChoiceIndex(choiceIndex);
         dialogueRounds++;
 
-        foreach (GameObject choiceButton in choices)
+        if (choices != null)
         {
-            choiceButton.SetActive(false);
+            foreach (GameObject choiceButton in choices)
+            {
+                if (choiceButton != null) choiceButton.SetActive(false);
+            }
         }
 
         if (dialogueRounds < 3)
@@ -161,12 +276,12 @@ public class DialogueManager : MonoBehaviour
         }
         else
         {
-            if (currentStory.canContinue)
+            if (currentStory.canContinue && dialogueText != null)
             {
                 dialogueText.text = currentStory.Continue();
             }
 
-            continueButton.SetActive(true);
+            if (continueButton != null) continueButton.SetActive(true);
             CheckNPCFollowStatus();
         }
     }
@@ -191,9 +306,9 @@ public class DialogueManager : MonoBehaviour
 
     private void ExitDialogueMode()
     {
-        // --- RESET EVERYTHING FOR GAMEPLAY ---
         dialogueIsPlaying = false;
-        dialoguePanel.SetActive(false);
+        externalDialogueSession = false;
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
 
         npcPoints = 0;
         dialogueRounds = 0;
@@ -206,3 +321,7 @@ public class DialogueManager : MonoBehaviour
         Debug.Log("Dialogue Mode Exited. Shooting should be re-enabled.");
     }
 }
+
+
+
+
