@@ -4015,11 +4015,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 511e4c322d313224ebf77c8d70a54f17, type: 3}
   m_PrefabInstance: {fileID: 299274058}
   m_PrefabAsset: {fileID: 0}
---- !u!64 &191997053 stripped
-MeshCollider:
-  m_CorrespondingSourceObject: {fileID: 6400000, guid: 511e4c322d313224ebf77c8d70a54f17, type: 3}
-  m_PrefabInstance: {fileID: 299274058}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &193354081
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -30290,9 +30285,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8913747ad7f580e40b9b81dc5f724c01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDebateBattle
-  enableDebateBattle: 1
+  enableDebateBattle: 0
   npc: {fileID: 0}
-  requiredRoomZone: {fileID: 191997053}
+  requiredRoomZone: {fileID: 0}
+  allowWhileFollowing: 1
+  debateAnywhereWhileFollowing: 1
+  playerTurnMode: 2
+  choiceInputTimeoutSeconds: 8
+  defaultChoiceIndex: 0
+  choiceOptions: []
+  fastPresetPlayerLines:
+  - Breathe. I'm here.
+  - You are not back there. You are here.
+  - Look at me. Stay in this room.
+  fastPresetInsanityDelta: -12
+  fastPresetCalmPointDelta: 1
   rounds: 3
   calmPointsToWin: 2
   betweenTurnsDelay: 0.3

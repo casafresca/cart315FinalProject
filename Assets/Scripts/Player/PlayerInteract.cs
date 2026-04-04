@@ -52,13 +52,17 @@ public class PlayerInteract : MonoBehaviour
 
             if (interactable != null)
             {
-                // 3. If this is an NPC and they are already following, DO NOT show text
+                // 3. Following NPCs are usually hidden from prompt, except when a debate
+                // battle can still be triggered from the current state (e.g., upstairs zone).
                 if (interactable is NPC npc && npc.isFollowing)
                 {
-                    return; // Skip showing the prompt message
+                    if (npc.DebateBattle == null || !npc.DebateBattle.CanTriggerFromCurrentState())
+                    {
+                        return;
+                    }
                 }
 
-                // 4. Otherwise, show the prompt and allow interaction.
+                // 4. Show prompt and allow interaction.
                 // TEMP DEBUG: use F to test if E conflicts with TTS input.
                 playerUI.UpdateText(interactable.promptMessage);
                 if (Input.GetKeyDown(interactKey))
