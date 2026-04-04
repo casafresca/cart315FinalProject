@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
-
-
-REPO_ROOT = Path(__file__).resolve().parent
+from typing import Dict, List, Optional, Sequence
 
 
 def _env(name: str, default: str) -> str:
@@ -13,15 +10,19 @@ def _env(name: str, default: str) -> str:
     return default if value is None or value == "" else value
 
 
+REPO_ROOT = Path(__file__).resolve().parent
+
 # Core TTS settings
 MODEL_NAME: str = _env("TTS_MODEL_NAME", "tts_models/multilingual/multi-dataset/xtts_v2")
 LANGUAGE: str = _env("TTS_LANGUAGE", "en")
 
-# Ollama / LLM settings (used by the *_llm*.py scripts)
+# Ollama / LLM settings
 LLM_MODEL: str = _env("LLM_MODEL", "llama3.2:1b")
 OLLAMA_EXE: str = _env("OLLAMA_EXE", str(REPO_ROOT / "ollama" / "ollama.exe"))
 OLLAMA_TIMEOUT_SECONDS: float = float(_env("OLLAMA_TIMEOUT_SECONDS", "60"))
 OLLAMA_PREP_TIMEOUT_SECONDS: float = float(_env("OLLAMA_PREP_TIMEOUT_SECONDS", "900"))
+# New: skip costly pull by default at startup
+OLLAMA_AUTO_PULL: bool = _env("OLLAMA_AUTO_PULL", "false").lower() in {"1", "true", "yes", "y"}
 
 # Voice reference files (XTTS voice cloning)
 VOICE_DIR: Path = Path(_env("VOICE_DIR", str(REPO_ROOT / "tortoise")))
@@ -62,7 +63,6 @@ VOICE_MAP: Dict[str, List[Path]] = {
 
 
 INFERENCE_KWARGS = {
-    # Conservative defaults (override per-script if desired).
     "temperature": float(_env("XTTS_TEMPERATURE", "0.25")),
     "top_p": float(_env("XTTS_TOP_P", "0.85")),
     "top_k": int(_env("XTTS_TOP_K", "50")),
@@ -94,6 +94,11 @@ def get_output_sample_rate(tts, default: int = 24000) -> int:
     return int(getattr(getattr(tts, "synthesizer", None), "output_sample_rate", default))
 
 
+# Runtime speed tuning
+FAST_REPLY_ENABLED: bool = _env("FAST_REPLY_ENABLED", "true").lower() in {"1", "true", "yes", "y"}
+FAST_REPLY_MAX_CHARS: int = int(_env("FAST_REPLY_MAX_CHARS", "220"))
+NORMAL_REPLY_MAX_CHARS: int = int(_env("NORMAL_REPLY_MAX_CHARS", "400"))
+MAX_SPEAKER_REFERENCES: int = int(_env("MAX_SPEAKER_REFERENCES", "1"))
 # RAG / research-memory settings
 RAG_ENABLED: bool = _env("RAG_ENABLED", "true").lower() in {"1", "true", "yes", "y"}
 RAG_TOP_K: int = int(_env("RAG_TOP_K", "4"))
@@ -105,3 +110,9 @@ RAG_CONTRADICTION_PROBABILITY: float = float(_env("RAG_CONTRADICTION_PROBABILITY
 RAG_RANDOM_SEED: int = int(_env("RAG_RANDOM_SEED", "42"))
 RAG_RESEARCH_DIR: Path = Path(_env("RAG_RESEARCH_DIR", str(REPO_ROOT.parent.parent / "Research")))
 RAG_CACHE_DIR: Path = Path(_env("RAG_CACHE_DIR", str(REPO_ROOT / ".cache" / "rag")))
+# New: defer RAG index build for faster scene startup
+RAG_LAZY_INIT: bool = _env("RAG_LAZY_INIT", "false").lower() in {"1", "true", "yes", "y"}
+
+
+
+

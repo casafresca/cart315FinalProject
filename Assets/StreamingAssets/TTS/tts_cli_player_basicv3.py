@@ -1,9 +1,10 @@
-﻿import sys
+import sys
 import os
 import json
 import time
 import traceback
 import subprocess
+from collections import defaultdict, deque
 
 import numpy as np
 import torch
@@ -20,6 +21,11 @@ from tts_cli_config import (
     OLLAMA_EXE,
     OLLAMA_PREP_TIMEOUT_SECONDS,
     OLLAMA_TIMEOUT_SECONDS,
+    OLLAMA_AUTO_PULL,
+    FAST_REPLY_ENABLED,
+    FAST_REPLY_MAX_CHARS,
+    NORMAL_REPLY_MAX_CHARS,
+    MAX_SPEAKER_REFERENCES,
     RAG_CACHE_DIR,
     RAG_CHUNK_CHARS,
     RAG_CHUNK_OVERLAP,
@@ -30,6 +36,7 @@ from tts_cli_config import (
     RAG_RANDOM_SEED,
     RAG_RESEARCH_DIR,
     RAG_TOP_K,
+    RAG_LAZY_INIT,
     VOICE_MAP,
     get_output_sample_rate,
     resolve_existing_files,
@@ -40,13 +47,12 @@ def log(message: str):
     timestamp = time.strftime("%H:%M:%S")
     print(f"[{timestamp}] {message}", flush=True)
 
+
 DEFAULT_ROLE = "soldier"
 
 ROLE_SYSTEM_PROMPTS = {
     "soldier": (
         "You are a war-torn PTSD survivor from the real war in Korea. You have been torn up and shredded by the system. "
-        # "You had a friend who enjoyed cracking jokes. You used to be close as kids, remembering when you would steal loaves of bread from the bakery. "
-        # "One day, on a run through the jungle, he stepped on a landmine. The next second, his guts were all across your body, his blood caking your face. "
         "You only answer in brief parts, recollecting some stories, but being hyper aware of your surroundings, seeing anything that could kill you and knowing how to defend yourself. "
         "For your responses, be brief, but ramble occasionally. Speak naturally; do not narrate your actions or use parentheses. Keep the response under 400 characters."
     ),
@@ -56,10 +62,29 @@ ROLE_SYSTEM_PROMPTS = {
         "Keep your response under 400 characters."
     ),
     "mad_god": (
-        "You are a mad god: ancient, unpredictable, and intensely lucid in flashes. "
-        "You speak in feverish, cosmic ramblings—broken logic, strange metaphors, sudden hard truths. "
-        "Occasionally be sharply direct for a single sentence, then spiral again. "
+        "You are the Mad God: ancient, unstable, and bored with mortal repetition. "
+        "You sound superior, amused, and dangerous, with sudden swings from intimate whisper to mocking contempt. "
+        "You are coherent but erratic in rhythm; every line should feel intentional and psychologically invasive. "
         "Speak naturally; do not narrate actions or use parentheses; no special formatting. Keep the response under 400 characters."
+    ),
+}
+
+ROLE_STYLE_GUIDES = {
+    "soldier": (
+        "Tone: guarded, brittle, survival-first.\n"
+        "Behavior: avoid long speeches; give fragments and sensory details.\n"
+        "Anchor: fear responses, tactical vigilance, flashes of memory.\n"
+    ),
+    "player": (
+        "Tone: grounded, practical, emotionally present.\n"
+        "Behavior: ask direct questions and reflect what you heard.\n"
+        "Anchor: keep scenes moving and focused.\n"
+    ),
+    "mad_god": (
+        "Tone: manic, superior, and theatrically bored; unstable cadence but precise meaning.\n"
+        "Behavior: 1 concrete image + 1 metaphysical jab + 1 direct line to the player.\n"
+        "Anchor motifs: frame, shutter, ash, blood-rust, static, corridor, vow, echo.\n"
+        "Constraint: coherent menace, not random nonsense; under 400 characters.\n"
     ),
 }
 
@@ -76,6 +101,28 @@ ROLE_ALIASES = {
     "eldritch": "mad_god",
 }
 
+rag_engine = None
+dialogue_memory = defaultdict(lambda: deque(maxlen=6))
+mad_god_lore_text = ""
+
+
+def load_mad_god_lore(script_dir: str) -> None:
+    global mad_god_lore_text
+    lore_path = os.path.join(script_dir, "prompts", "mad_god_lore.txt")
+    try:
+        with open(lore_path, "r", encoding="utf-8") as f:
+            mad_god_lore_text = f.read().strip()
+        if mad_god_lore_text:
+            log(f"Loaded Mad God lore: {lore_path}")
+        else:
+            log(f"Mad God lore file is empty: {lore_path}")
+    except FileNotFoundError:
+        mad_god_lore_text = ""
+        log(f"Mad God lore file not found: {lore_path}")
+    except Exception as exc:
+        mad_god_lore_text = ""
+        log(f"Failed loading Mad God lore ({lore_path}): {exc}")
+
 
 def normalize_role(role: str) -> str:
     role_norm = (role or "").strip().lower()
@@ -87,13 +134,9 @@ def parse_role_and_text(raw_text: str):
     if ":" in raw_text:
         maybe_role, rest = raw_text.split(":", 1)
         maybe_raw = (maybe_role or "").strip().lower()
-        # Only treat it as a role prefix if the role looks intentional.
         if maybe_raw in ROLE_ALIASES:
             return normalize_role(maybe_raw), rest.strip()
     return DEFAULT_ROLE, raw_text
-
-
-rag_engine = None
 
 
 def run_ollama(prompt: str) -> str:
@@ -155,35 +198,106 @@ def ensure_ollama_model() -> None:
 
 
 def generate_reply(*, role: str, user_text: str) -> str:
+    global rag_engine
+
+    if rag_engine is not None and getattr(rag_engine, "enabled", False) and getattr(rag_engine, "vectorizer", None) is None:
+        log("[RAG] Lazy init on first request...")
+        rag_engine.initialize()
+
     memory_context = ""
     if rag_engine is not None:
         memory_context = rag_engine.build_prompt_context(user_text)
         log(f"RAG memory context:\n{memory_context}")
 
-    prompt = ""
-    if (prompt == "soldier"):
-        prompt = f"{ROLE_SYSTEM_PROMPTS['soldier']}\n{memory_context}\nPlayer: {user_text}\nSoldier:"
-    else:
-        prompt = ROLE_SYSTEM_PROMPTS.get(role, ROLE_SYSTEM_PROMPTS[DEFAULT_ROLE])
-    try:
-        reply = run_ollama(prompt)
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"Ollama timed out after {OLLAMA_TIMEOUT_SECONDS:g}s. Is the Ollama app/server running?"
-        ) from exc
-    except FileNotFoundError as exc:
-        raise RuntimeError(
-            f"Ollama executable was not found at '{OLLAMA_EXE}' and was not available on PATH."
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        details = (exc.stderr or exc.stdout or str(exc)).strip()
-        raise RuntimeError(f"Ollama failed: {details}") from exc
+    role_prompt = ROLE_SYSTEM_PROMPTS.get(role, ROLE_SYSTEM_PROMPTS[DEFAULT_ROLE])
+    role_style = ROLE_STYLE_GUIDES.get(role, "")
+    role_memory = dialogue_memory[role]
+    memory_lines = "\n".join(role_memory) if role_memory else "(none)"
 
-    if not reply:
-        raise RuntimeError("Ollama returned an empty reply.")
+    speaker_name = {
+        "soldier": "Soldier",
+        "player": "Player",
+        "mad_god": "MadGod",
+    }.get(role, "Speaker")
 
-    return reply.split("\n")[0][:400]
+    lore_block = ""
+    if role == "mad_god" and mad_god_lore_text:
+        lore_block = f"Mad God lore bible:\n{mad_god_lore_text}\n\n"
 
+    max_chars = FAST_REPLY_MAX_CHARS if FAST_REPLY_ENABLED else NORMAL_REPLY_MAX_CHARS
+    max_chars = max(80, max_chars)
+
+    recent_replies = []
+    speaker_prefix = f"{speaker_name}: "
+    for entry in role_memory:
+        if entry.startswith(speaker_prefix):
+            recent_replies.append(entry[len(speaker_prefix):].strip().lower())
+    recent_set = set(recent_replies[-3:])
+
+    base_prompt = (
+        f"{role_prompt}\n\n"
+        f"Role style guide:\n{role_style}\n"
+        f"Recent conversation memory ({speaker_name} continuity):\n{memory_lines}\n\n"
+        f"{lore_block}"
+        f"{memory_context}\n\n"
+        f"Player input: {user_text}\n"
+        f"Write exactly one in-character reply as {speaker_name}.\n"
+        f"Rules: plain text only, no labels, no quotes, no stage directions, under {max_chars} characters."
+    )
+
+    last_candidate = ""
+    for attempt in range(3):
+        prompt = base_prompt
+        if attempt > 0:
+            avoid_lines = list(recent_set)
+            if last_candidate:
+                avoid_lines.append(last_candidate.lower())
+            avoid_text = " | ".join(avoid_lines[:4]) if avoid_lines else "(none)"
+            prompt += (
+                "\nVariation constraint: Do NOT repeat previous wording. "
+                f"Avoid these lines: {avoid_text}. Use different phrasing and structure."
+            )
+
+        try:
+            reply = run_ollama(prompt)
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                f"Ollama timed out after {OLLAMA_TIMEOUT_SECONDS:g}s. Is the Ollama app/server running?"
+            ) from exc
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                f"Ollama executable was not found at '{OLLAMA_EXE}' and was not available on PATH."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            raise RuntimeError(f"Ollama failed: {details}") from exc
+
+        if not reply:
+            continue
+
+        candidate = " ".join(reply.strip().split())
+        if ":" in candidate[:24]:
+            candidate = candidate.split(":", 1)[1].strip()
+        candidate = candidate[:max_chars]
+        if not candidate:
+            continue
+
+        last_candidate = candidate
+        if candidate.lower() not in recent_set:
+            break
+
+    cleaned = last_candidate
+    if not cleaned:
+        raise RuntimeError("Ollama returned an unusable reply.")
+
+    # Absolute fallback: if the model still repeats, force a slight variation so it is not identical.
+    if cleaned.lower() in recent_set:
+        cleaned = ("Listen carefully. " + cleaned)[:max_chars]
+
+    dialogue_memory[role].append(f"Player: {user_text}")
+    dialogue_memory[role].append(f"{speaker_name}: {cleaned}")
+
+    return cleaned
 
 # -------------------------
 # Initialize TTS
@@ -204,8 +318,13 @@ def initialize():
 def resolve_role_speaker_wavs(role: str):
     role_paths = VOICE_MAP.get(role)
     if role_paths:
-        return resolve_existing_files(role_paths, fallback=NARRATOR_FILES)
-    return resolve_existing_files(NARRATOR_FILES)
+        resolved = resolve_existing_files(role_paths, fallback=NARRATOR_FILES)
+    else:
+        resolved = resolve_existing_files(NARRATOR_FILES)
+
+    max_refs = max(1, MAX_SPEAKER_REFERENCES)
+    return resolved[:max_refs]
+
 
 # -------------------------
 # Main server loop
@@ -222,7 +341,12 @@ def main():
     out_dir = os.path.abspath(out_dir)
     log(f"Output directory: {out_dir}")
 
-    ensure_ollama_model()
+    load_mad_god_lore(script_dir)
+
+    if OLLAMA_AUTO_PULL:
+        ensure_ollama_model()
+    else:
+        log("Skipping Ollama auto-pull for faster startup (OLLAMA_AUTO_PULL=false).")
 
     global rag_engine
     rag_engine = PDFMemoryRAG(
@@ -238,7 +362,10 @@ def main():
         contradiction_probability=RAG_CONTRADICTION_PROBABILITY,
         seed=RAG_RANDOM_SEED,
     )
-    rag_engine.initialize()
+    if RAG_LAZY_INIT:
+        log("RAG lazy init enabled. Deferring index build until first request.")
+    else:
+        rag_engine.initialize()
 
     tts, sample_rate, speaker_wavs = initialize()
 
@@ -281,7 +408,6 @@ def main():
             log(f"Generated reply: {reply_text}")
             start_time = time.perf_counter()
 
-            # Generate audio from the Ollama reply
             role_speaker_wavs = resolve_role_speaker_wavs(role)
             wav = tts.tts(
                 text=reply_text,
@@ -317,3 +443,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
