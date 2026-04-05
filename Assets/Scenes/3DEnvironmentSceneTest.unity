@@ -30285,7 +30285,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8913747ad7f580e40b9b81dc5f724c01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDebateBattle
-  enableDebateBattle: 0
+  enableDebateBattle: 1
   npc: {fileID: 0}
   requiredRoomZone: {fileID: 0}
   allowWhileFollowing: 1
