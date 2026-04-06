@@ -17,14 +17,10 @@ public class PlayerHitbox : MonoBehaviour
     // This is the function the NPC Bullets will call when they hit the player
     public void ApplyDamage(float damageAmount)
     {
+        // Send the final damage amount to the PlayerHealth script
         if (health != null)
-        {
-            // Send the final damage amount to the PlayerHealth script
             health.ApplyDamage(damageAmount * damageMultiplier);
-        }
         else
-        {
             Debug.LogWarning("PlayerHitbox: No PlayerHealth script found on this object!");
-        }
     }
 }

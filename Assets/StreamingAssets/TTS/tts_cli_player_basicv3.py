@@ -424,8 +424,8 @@ def generate_choices(*, role: str, user_text: str, n: int) -> list[str]:
 # -------------------------
 def initialize():
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
-    log(f"Loading model: {MODEL_NAME}")
+    #log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
+    #log(f"Loading model: {MODEL_NAME}")
     start = time.perf_counter()
     tts = TTS(MODEL_NAME).to(device)
     load_time = time.perf_counter() - start
@@ -459,7 +459,7 @@ def main():
 
     os.makedirs(out_dir, exist_ok=True)
     out_dir = os.path.abspath(out_dir)
-    log(f"Output directory: {out_dir}")
+    #log(f"Output directory: {out_dir}")
 
     load_mad_god_lore(script_dir)
 
@@ -538,7 +538,7 @@ def main():
                     "choices": choices,
                 }
                 print(json.dumps(response), flush=True)
-                log(f"Choices sent for request {request_id} ({len(choices)} items)")
+                #log(f"Choices sent for request {request_id} ({len(choices)} items)")
             except Exception as e:
                 log(f"Error: {e}")
                 traceback.print_exc()
@@ -573,7 +573,7 @@ def main():
 
             out_path = os.path.abspath(os.path.join(out_dir, f"tts_{request_id}_{int(time.time() * 1000)}.wav"))
             sf.write(out_path, wav_np, sample_rate)
-            log(f"Wrote WAV file: {out_path} ({os.path.getsize(out_path)} bytes)")
+            #log(f"Wrote WAV file: {out_path} ({os.path.getsize(out_path)} bytes)")
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
             response = {
@@ -586,7 +586,7 @@ def main():
                 "elapsedMs": elapsed_ms,
             }
             print(json.dumps(response), flush=True)
-            log(f"Result sent for request {request_id}")
+            #log(f"Result sent for request {request_id}")
 
         except Exception as e:
             log(f"Error: {e}")

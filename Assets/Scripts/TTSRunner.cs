@@ -122,9 +122,7 @@ public class TTSRunner : MonoBehaviour
         // Prefer project-local venv Python if available; otherwise keep inspector/path value.
         string bundledPython = Path.Combine(ttsRoot, ".venv", "Scripts", "python.exe");
         if (File.Exists(bundledPython))
-        {
             pythonExe = bundledPython;
-        }
 
         Debug.Log($"[TTS] Root: {ttsRoot}");
         Debug.Log($"[TTS] Script: {scriptPath}");
@@ -135,34 +133,12 @@ public class TTSRunner : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(triggerKey))
-        {
-            Debug.Log("[TTS] E pressed");
-
-            if (!isReady)
-            {
-                Debug.LogWarning("[TTS] Not ready yet!");
-            }
-            else if (isSpeaking)
-            {
-                Debug.LogWarning("[TTS] Already speaking!");
-            }
-            else
-            {
-                Speak(testLine);
-            }
-        }
-
         DrainQueues();
     }
 
     void OnDestroy()
     {
-        if (Instance == this)
-        {
-            Instance = null;
-        }
-
+        if (Instance == this) Instance = null;
         StopPython();
         ClearSubtitle();
     }
@@ -284,6 +260,24 @@ public class TTSRunner : MonoBehaviour
     public void SpeakExactAs(string role, string exactText)
     {
         StartCoroutine(SpeakRoutine(role, exactText, mode: "direct"));
+    }
+
+    /// <summary>
+    /// Triggers speaking with the test line, replicating the Update key press logic.
+    /// </summary>
+    public void TriggerSpeak()
+    {
+        if (!isReady)
+        {
+            Debug.LogWarning("[TTS] Not ready yet!");
+            return;
+        }
+        if (isSpeaking)
+        {
+            Debug.LogWarning("[TTS] Already speaking!");
+            return;
+        }
+        Speak(testLine);
     }
 
     /// <summary>
