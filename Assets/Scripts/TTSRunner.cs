@@ -3,6 +3,7 @@ using UnityEngine.Networking;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using TMPro;
@@ -71,6 +72,7 @@ public class TTSRunner : MonoBehaviour
     private bool isReady = false;
     private int nextId = 1;
     private bool isSpeaking = false;
+    private bool isAwaitingResponse = false;
     private int lastCompletedRequestId;
     private string lastCompletedReplyText = string.Empty;
     private string lastCompletedRole = string.Empty;
@@ -81,6 +83,7 @@ public class TTSRunner : MonoBehaviour
     // Read-only state exposed for other gameplay visuals (e.g., talking sprites).
     public bool IsSpeaking => isSpeaking;
     public bool IsReady => isReady;
+    public bool IsBusy => isSpeaking || isAwaitingResponse;
     public int LastCompletedRequestId => lastCompletedRequestId;
     public string LastCompletedReplyText => lastCompletedReplyText;
     public string LastCompletedRole => lastCompletedRole;
@@ -272,16 +275,38 @@ public class TTSRunner : MonoBehaviour
 
     public void SpeakAs(string role, string text)
     {
-        StartCoroutine(SpeakRoutine(role, text));
+        StartCoroutine(SpeakRoutine(role, text, mode: "ai"));
     }
 
-    IEnumerator SpeakRoutine(string role, string text)
+    /// <summary>
+    /// Speaks the provided text verbatim (no LLM rewrite).
+    /// </summary>
+    public void SpeakExactAs(string role, string exactText)
+    {
+        StartCoroutine(SpeakRoutine(role, exactText, mode: "direct"));
+    }
+
+    /// <summary>
+    /// Requests N distinct text-only choices from the Python LLM (no TTS audio generated).
+    /// </summary>
+    public void RequestChoices(string role, string prompt, int count, Action<string[]> onComplete)
+    {
+        StartCoroutine(RequestChoicesRoutine(role, prompt, count, onComplete));
+    }
+
+    IEnumerator SpeakRoutine(string role, string text, string mode)
     {
         isSpeaking = true;
+        isAwaitingResponse = true;
 
         int id = nextId++;
         string safeRole = string.IsNullOrWhiteSpace(role) ? "soldier" : Escape(role);
-        string json = $"{{\"id\":{id},\"role\":\"{safeRole}\",\"text\":\"{Escape(text)}\"}}";
+
+        string safeText = Escape(text ?? string.Empty);
+        string safeMode = string.IsNullOrWhiteSpace(mode) ? "ai" : Escape(mode);
+        string json = safeMode == "ai"
+            ? $"{{\"id\":{id},\"role\":\"{safeRole}\",\"text\":\"{safeText}\"}}"
+            : $"{{\"id\":{id},\"role\":\"{safeRole}\",\"text\":\"{safeText}\",\"mode\":\"{safeMode}\"}}";
 
         Debug.Log($"[TTS] Sending: {text}");
         SendJson(json);
@@ -291,6 +316,7 @@ public class TTSRunner : MonoBehaviour
 
         while (Time.time < timeout)
         {
+            List<string> deferred = null;
             while (resultQueue.TryDequeue(out string line))
             {
                 Debug.Log("[PY STDOUT] " + line);
@@ -314,7 +340,8 @@ public class TTSRunner : MonoBehaviour
 
                 if (response == null || response.id != id)
                 {
-                    Debug.LogWarning("[TTS] Ignoring unrelated message: " + line);
+                    deferred ??= new List<string>();
+                    deferred.Add(line);
                     continue;
                 }
 
@@ -322,7 +349,12 @@ public class TTSRunner : MonoBehaviour
                 {
                     Debug.LogError("[TTS ERROR] " + response.error);
                     ClearSubtitle();
+                    isAwaitingResponse = false;
                     isSpeaking = false;
+                    if (deferred != null)
+                    {
+                        for (int i = 0; i < deferred.Count; i++) resultQueue.Enqueue(deferred[i]);
+                    }
                     yield break;
                 }
 
@@ -331,11 +363,21 @@ public class TTSRunner : MonoBehaviour
                 lastCompletedReplyText = response.replyText ?? string.Empty;
                 lastCompletedRole = role;
                 string fullPath = response.wavPath;
+                isAwaitingResponse = false;
 
                 yield return PlayWav(fullPath, role, lastCompletedReplyText);
 
                 isSpeaking = false;
+                if (deferred != null)
+                {
+                    for (int i = 0; i < deferred.Count; i++) resultQueue.Enqueue(deferred[i]);
+                }
                 yield break;
+            }
+
+            if (deferred != null)
+            {
+                for (int i = 0; i < deferred.Count; i++) resultQueue.Enqueue(deferred[i]);
             }
 
             DrainQueues();
@@ -344,7 +386,87 @@ public class TTSRunner : MonoBehaviour
 
         Debug.LogError("TTS timeout.");
         ClearSubtitle();
+        isAwaitingResponse = false;
         isSpeaking = false;
+    }
+
+    IEnumerator RequestChoicesRoutine(string role, string prompt, int count, Action<string[]> onComplete)
+    {
+        isAwaitingResponse = true;
+
+        int id = nextId++;
+        int safeCount = Mathf.Clamp(count, 1, 8);
+        string safeRole = string.IsNullOrWhiteSpace(role) ? "player" : Escape(role);
+        string json = $"{{\"id\":{id},\"cmd\":\"choices\",\"role\":\"{safeRole}\",\"text\":\"{Escape(prompt ?? string.Empty)}\",\"n\":{safeCount}}}";
+
+        Debug.Log($"[TTS] Requesting {safeCount} choices for role={role}...");
+        SendJson(json);
+
+        float timeout = Time.time + requestTimeoutSeconds;
+        while (Time.time < timeout)
+        {
+            List<string> deferred = null;
+            while (resultQueue.TryDequeue(out string line))
+            {
+                if (TryHandleReady(line)) continue;
+
+                if (!line.Contains("\"type\"")) continue;
+
+                TTSChoicesResponse response;
+                try
+                {
+                    response = JsonUtility.FromJson<TTSChoicesResponse>(line);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (response == null || response.id != id)
+                {
+                    deferred ??= new List<string>();
+                    deferred.Add(line);
+                    continue;
+                }
+
+                if (response.type == "error")
+                {
+                    Debug.LogError("[TTS ERROR] " + response.error);
+                    isAwaitingResponse = false;
+                    onComplete?.Invoke(Array.Empty<string>());
+                    if (deferred != null)
+                    {
+                        for (int i = 0; i < deferred.Count; i++) resultQueue.Enqueue(deferred[i]);
+                    }
+                    yield break;
+                }
+
+                if (response.type != "choices")
+                {
+                    continue;
+                }
+
+                isAwaitingResponse = false;
+                onComplete?.Invoke(response.choices ?? Array.Empty<string>());
+                if (deferred != null)
+                {
+                    for (int i = 0; i < deferred.Count; i++) resultQueue.Enqueue(deferred[i]);
+                }
+                yield break;
+            }
+
+            if (deferred != null)
+            {
+                for (int i = 0; i < deferred.Count; i++) resultQueue.Enqueue(deferred[i]);
+            }
+
+            DrainQueues();
+            yield return null;
+        }
+
+        Debug.LogError("[TTS] Choices timeout.");
+        isAwaitingResponse = false;
+        onComplete?.Invoke(Array.Empty<string>());
     }
 
     // -------------------------
@@ -372,19 +494,26 @@ public class TTSRunner : MonoBehaviour
             if (TryHandleReady(line))
                 continue;
 
-            // If it's a result message, store it for SpeakRoutine
-            if (line.Contains("\"type\""))
+            // If it's a result message, store it for whichever routine is waiting.
+            if (!line.Contains("\"type\""))
             {
-                try
-                {
-                    var response = JsonUtility.FromJson<TTSResponse>(line);
-                    if (response != null && (response.type == "result" || response.type == "error"))
-                    {
-                        resultQueue.Enqueue(line);
-                    }
-                }
-                catch { }
+                continue;
             }
+
+            try
+            {
+                var baseMsg = JsonUtility.FromJson<TTSBaseResponse>(line);
+                if (baseMsg == null || string.IsNullOrWhiteSpace(baseMsg.type))
+                {
+                    continue;
+                }
+
+                if (baseMsg.type == "result" || baseMsg.type == "error" || baseMsg.type == "choices")
+                {
+                    resultQueue.Enqueue(line);
+                }
+            }
+            catch { }
         }
 
         DrainStderr();
@@ -760,12 +889,28 @@ public class TTSRunner : MonoBehaviour
     }
 
     [Serializable]
+    class TTSBaseResponse
+    {
+        public string type;
+        public int id;
+    }
+
+    [Serializable]
     class TTSResponse
     {
         public string type;
         public int id;
         public string wavPath;
         public string replyText;
+        public string error;
+    }
+
+    [Serializable]
+    class TTSChoicesResponse
+    {
+        public string type;
+        public int id;
+        public string[] choices;
         public string error;
     }
 }
