@@ -6,6 +6,8 @@ using UnityEngine.SceneManagement;
 
 public class PhotoCapture : MonoBehaviour
 {
+    private const string BoardRevealAnimatorStateName = "PhotoFade";
+
     [Header("Photo Capture Settings")]
     [SerializeField] private Image photoDisplayArea;
     [SerializeField] private GameObject photoFrame;
@@ -23,6 +25,18 @@ public class PhotoCapture : MonoBehaviour
     [Header("Photo Fader Effect")]
     [SerializeField] private Animator fadingAnimation;
 
+    [Header("Board Reveal Sequence")]
+    [SerializeField] private GameObject boardSequenceRoot;
+    [SerializeField] private Image boardBackgroundImage;
+    [SerializeField] private Image developingPhotoImage;
+    [SerializeField] private CanvasGroup developingPhotoCanvasGroup;
+    [SerializeField] private Sprite emptyBoardSprite;
+    [SerializeField] private Sprite[] completedBoardSprites;
+    [SerializeField] private float photoPreviewSeconds = 1.1f;
+    [SerializeField] private float boardAppearDelay = 0.2f;
+    [SerializeField] private float photoDevelopDuration = 2.75f;
+    [SerializeField] private float completedBoardHoldSeconds = 1.35f;
+
     [Header("Audio")]
     [SerializeField] private AudioSource cameraAudio;
 
@@ -33,6 +47,7 @@ public class PhotoCapture : MonoBehaviour
     private bool viewingPhoto;
     private bool cameraUnlocked;
     private Coroutine returnCountdownRoutine;
+    private Coroutine revealSequenceRoutine;
 
     private void Start()
     {
@@ -40,6 +55,7 @@ public class PhotoCapture : MonoBehaviour
         SetPhotoVisible(false);
         SetCameraUiVisible(false);
         SetReturnCountdownVisible(false);
+        SetBoardSequenceVisible(false);
         Debug.Log("[PhotoCapture] Photo capture system initialized. Photo frame and camera UI start hidden.");
     }
 
@@ -56,7 +72,7 @@ public class PhotoCapture : MonoBehaviour
             StartCoroutine(CapturePhoto());
         }
 
-        if (Input.GetMouseButtonDown(1) && viewingPhoto)
+        if (Input.GetMouseButtonDown(1) && viewingPhoto && revealSequenceRoutine == null)
         {
             Debug.Log("[PhotoCapture] Right mouse clicked. Closing photo preview.");
             RemovePhoto();
@@ -151,18 +167,17 @@ public class PhotoCapture : MonoBehaviour
             photoDisplayArea.preserveAspect = true;
         }
 
+        isCaptureModeActive = false;
         viewingPhoto = true;
         SetPhotoVisible(true);
         Debug.Log("[PhotoCapture] Captured photo is now displayed and photo frame is visible.");
 
-        StartReturnCountdown();
-
-        if (fadingAnimation != null)
+        if (revealSequenceRoutine != null)
         {
-            fadingAnimation.Play("PhotoFade");
+            StopCoroutine(revealSequenceRoutine);
         }
 
-        StartCoroutine(CameraFlashEffect());
+        revealSequenceRoutine = StartCoroutine(PhotoEndingSequence());
     }
 
     private Texture2D BuildFinalPhotoTexture()
@@ -235,6 +250,127 @@ public class PhotoCapture : MonoBehaviour
         if (cameraFlash != null)
         {
             cameraFlash.SetActive(false);
+        }
+    }
+
+    private IEnumerator PhotoEndingSequence()
+    {
+        yield return StartCoroutine(CameraFlashEffect());
+
+        PlayPhotoFadeAnimation();
+        yield return new WaitForSeconds(Mathf.Max(0f, photoPreviewSeconds));
+
+        viewingPhoto = false;
+        SetPhotoVisible(false);
+
+        if (boardSequenceRoot == null || boardBackgroundImage == null)
+        {
+            Debug.LogWarning("[PhotoCapture] Board reveal UI is not fully assigned. Falling back to countdown return.");
+            StartReturnCountdown();
+            revealSequenceRoutine = null;
+            yield break;
+        }
+
+        yield return new WaitForSeconds(Mathf.Max(0f, boardAppearDelay));
+
+        int capturedCount = TherapySessionState.RegisterCapturedSoldier();
+        yield return StartCoroutine(PlayBoardRevealSequence(capturedCount));
+
+        StartReturnCountdown();
+        revealSequenceRoutine = null;
+    }
+
+    private IEnumerator PlayBoardRevealSequence(int capturedCount)
+    {
+        SetBoardSequenceVisible(true);
+
+        if (emptyBoardSprite != null)
+        {
+            boardBackgroundImage.sprite = emptyBoardSprite;
+            boardBackgroundImage.preserveAspect = true;
+        }
+
+        if (developingPhotoImage != null)
+        {
+            developingPhotoImage.sprite = capturedPhotoSprite;
+            developingPhotoImage.preserveAspect = true;
+            developingPhotoImage.enabled = capturedPhotoSprite != null;
+            developingPhotoImage.color = new Color(1f, 1f, 1f, 0f);
+        }
+
+        if (developingPhotoCanvasGroup != null)
+        {
+            developingPhotoCanvasGroup.alpha = 0f;
+        }
+
+        float duration = Mathf.Max(0.01f, photoDevelopDuration);
+        float timer = 0f;
+
+        while (timer < duration)
+        {
+            timer += Time.deltaTime;
+            float t = Mathf.Clamp01(timer / duration);
+            float eased = Mathf.SmoothStep(0f, 1f, t);
+            SetDevelopmentVisibility(eased);
+            yield return null;
+        }
+
+        SetDevelopmentVisibility(1f);
+
+        Sprite completedBoardSprite = GetCompletedBoardSpriteForCount(capturedCount);
+        if (completedBoardSprite != null)
+        {
+            boardBackgroundImage.sprite = completedBoardSprite;
+            boardBackgroundImage.preserveAspect = true;
+        }
+
+        if (developingPhotoImage != null)
+        {
+            developingPhotoImage.enabled = false;
+        }
+
+        if (developingPhotoCanvasGroup != null)
+        {
+            developingPhotoCanvasGroup.alpha = 0f;
+        }
+
+        yield return new WaitForSeconds(Mathf.Max(0f, completedBoardHoldSeconds));
+        SetBoardSequenceVisible(false);
+    }
+
+    private void SetDevelopmentVisibility(float normalized)
+    {
+        float alpha = Mathf.Clamp01(normalized);
+
+        if (developingPhotoCanvasGroup != null)
+        {
+            developingPhotoCanvasGroup.alpha = alpha;
+        }
+
+        if (developingPhotoImage != null)
+        {
+            Color color = developingPhotoImage.color;
+            color.a = alpha;
+            developingPhotoImage.color = color;
+        }
+    }
+
+    private Sprite GetCompletedBoardSpriteForCount(int capturedCount)
+    {
+        if (completedBoardSprites == null || completedBoardSprites.Length == 0)
+        {
+            return emptyBoardSprite;
+        }
+
+        int index = Mathf.Clamp(capturedCount - 1, 0, completedBoardSprites.Length - 1);
+        return completedBoardSprites[index];
+    }
+
+    private void PlayPhotoFadeAnimation()
+    {
+        if (fadingAnimation != null)
+        {
+            fadingAnimation.Play(BoardRevealAnimatorStateName);
         }
     }
 
@@ -314,11 +450,24 @@ public class PhotoCapture : MonoBehaviour
         }
     }
 
+    private void SetBoardSequenceVisible(bool isVisible)
+    {
+        if (boardSequenceRoot != null)
+        {
+            boardSequenceRoot.SetActive(isVisible);
+        }
+    }
+
     private void OnDestroy()
     {
         if (returnCountdownRoutine != null)
         {
             StopCoroutine(returnCountdownRoutine);
+        }
+
+        if (revealSequenceRoutine != null)
+        {
+            StopCoroutine(revealSequenceRoutine);
         }
 
         if (capturedPhotoSprite != null)
