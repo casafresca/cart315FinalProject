@@ -5,10 +5,19 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using TMPro;
+using UnityEngine.UI;
 using Debug = UnityEngine.Debug;
 
 public class TTSRunner : MonoBehaviour
 {
+    [Serializable]
+    private class SpeakerDisplayName
+    {
+        public string role = "soldier";
+        public string displayName = "Soldier";
+    }
+
     // GLOBAL ACCESS
     public static TTSRunner Instance;
 
@@ -33,6 +42,25 @@ public class TTSRunner : MonoBehaviour
     [SerializeField] private int fastMaxSpeakerReferences = 1;
     [SerializeField] private int normalMaxSpeakerReferences = 2;
 
+    [Header("Subtitles")]
+    [SerializeField] private bool enableSubtitles = true;
+    [Tooltip("If empty, TTSRunner creates a bottom-screen subtitle UI at runtime.")]
+    [SerializeField] private TextMeshProUGUI subtitleSpeakerText;
+    [Tooltip("If empty, TTSRunner creates a bottom-screen subtitle UI at runtime.")]
+    [SerializeField] private TextMeshProUGUI subtitleBodyText;
+    [SerializeField] private bool typewriterSubtitles = true;
+    [SerializeField] private float minimumSubtitleCharactersPerSecond = 18f;
+    [SerializeField] private float subtitlePadding = 36f;
+    [SerializeField] private float subtitleSpeakerFontSize = 20f;
+    [SerializeField] private float subtitleBodyFontSize = 26f;
+    [SerializeField] private int maxSubtitleCharacters = 140;
+    [SerializeField] private SpeakerDisplayName[] speakerDisplayNames =
+    {
+        new SpeakerDisplayName { role = "soldier", displayName = "Soldier" },
+        new SpeakerDisplayName { role = "player", displayName = "You" },
+        new SpeakerDisplayName { role = "mad_god", displayName = "Mad God" }
+    };
+
     readonly ConcurrentQueue<string> resultQueue = new ConcurrentQueue<string>();
 
     private Process process;
@@ -43,10 +71,19 @@ public class TTSRunner : MonoBehaviour
     private bool isReady = false;
     private int nextId = 1;
     private bool isSpeaking = false;
+    private int lastCompletedRequestId;
+    private string lastCompletedReplyText = string.Empty;
+    private string lastCompletedRole = string.Empty;
+    private Coroutine subtitleCoroutine;
+    private GameObject runtimeSubtitleCanvas;
+    private GameObject runtimeSubtitlePanel;
 
     // Read-only state exposed for other gameplay visuals (e.g., talking sprites).
     public bool IsSpeaking => isSpeaking;
     public bool IsReady => isReady;
+    public int LastCompletedRequestId => lastCompletedRequestId;
+    public string LastCompletedReplyText => lastCompletedReplyText;
+    public string LastCompletedRole => lastCompletedRole;
 
     [Header("Timing")]
     [SerializeField] private float requestTimeoutSeconds = 120f;
@@ -89,6 +126,7 @@ public class TTSRunner : MonoBehaviour
         Debug.Log($"[TTS] Root: {ttsRoot}");
         Debug.Log($"[TTS] Script: {scriptPath}");
 
+        EnsureSubtitleUi();
         StartPython();
     }
 
@@ -123,6 +161,7 @@ public class TTSRunner : MonoBehaviour
         }
 
         StopPython();
+        ClearSubtitle();
     }
 
     // -------------------------
@@ -282,14 +321,18 @@ public class TTSRunner : MonoBehaviour
                 if (response.type == "error")
                 {
                     Debug.LogError("[TTS ERROR] " + response.error);
+                    ClearSubtitle();
                     isSpeaking = false;
                     yield break;
                 }
 
                 Debug.Log("[TTS] Reply text: " + response.replyText);
+                lastCompletedRequestId = response.id;
+                lastCompletedReplyText = response.replyText ?? string.Empty;
+                lastCompletedRole = role;
                 string fullPath = response.wavPath;
 
-                yield return PlayWav(fullPath);
+                yield return PlayWav(fullPath, role, lastCompletedReplyText);
 
                 isSpeaking = false;
                 yield break;
@@ -300,6 +343,7 @@ public class TTSRunner : MonoBehaviour
         }
 
         Debug.LogError("TTS timeout.");
+        ClearSubtitle();
         isSpeaking = false;
     }
 
@@ -372,13 +416,14 @@ public class TTSRunner : MonoBehaviour
         return false;
     }
 
-    IEnumerator PlayWav(string path)
+    IEnumerator PlayWav(string path, string role, string replyText)
     {
         Debug.Log("[TTS] Loading WAV: " + path);
 
         if (!File.Exists(path))
         {
             Debug.LogError("[TTS] File missing: " + path);
+            ClearSubtitle();
             yield break;
         }
 
@@ -390,6 +435,7 @@ public class TTSRunner : MonoBehaviour
         if (req.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError("[TTS] Load failed: " + req.error);
+            ClearSubtitle();
             yield break;
         }
 
@@ -398,12 +444,14 @@ public class TTSRunner : MonoBehaviour
         if (clip == null)
         {
             Debug.LogError("[TTS] Clip is null!");
+            ClearSubtitle();
             yield break;
         }
 
         Debug.Log($"[TTS] Clip loaded: {clip.length}s");
 
         audioSource.clip = clip;
+        ShowSubtitle(role, replyText, clip.length);
         audioSource.Play();
 
         Debug.Log("[TTS] Playing audio...");
@@ -412,6 +460,7 @@ public class TTSRunner : MonoBehaviour
             yield return null;
 
         Debug.Log("[TTS] Playback finished");
+        ClearSubtitle();
 
         try
         {
@@ -430,6 +479,274 @@ public class TTSRunner : MonoBehaviour
     string Escape(string s)
     {
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    private void EnsureSubtitleUi()
+    {
+        if (!enableSubtitles)
+        {
+            return;
+        }
+
+        if (subtitleSpeakerText != null && subtitleBodyText != null)
+        {
+            ApplySubtitleAppearance();
+            subtitleSpeakerText.gameObject.SetActive(false);
+            subtitleBodyText.gameObject.SetActive(false);
+            subtitleSpeakerText.text = string.Empty;
+            subtitleBodyText.text = string.Empty;
+            return;
+        }
+
+        if (runtimeSubtitlePanel != null && subtitleSpeakerText != null && subtitleBodyText != null)
+        {
+            return;
+        }
+
+        Canvas existingCanvas = FindObjectOfType<Canvas>();
+        if (existingCanvas == null)
+        {
+            runtimeSubtitleCanvas = new GameObject("TTS Subtitle Canvas");
+            existingCanvas = runtimeSubtitleCanvas.AddComponent<Canvas>();
+            existingCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            runtimeSubtitleCanvas.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            runtimeSubtitleCanvas.AddComponent<GraphicRaycaster>();
+        }
+
+        runtimeSubtitlePanel = new GameObject("TTS Subtitle Panel");
+        runtimeSubtitlePanel.transform.SetParent(existingCanvas.transform, false);
+
+        RectTransform panelRect = runtimeSubtitlePanel.AddComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0.08f, 0f);
+        panelRect.anchorMax = new Vector2(0.92f, 0f);
+        panelRect.pivot = new Vector2(0.5f, 0f);
+        panelRect.anchoredPosition = new Vector2(0f, subtitlePadding);
+        panelRect.sizeDelta = new Vector2(0f, 132f);
+
+        Image panelImage = runtimeSubtitlePanel.AddComponent<Image>();
+        panelImage.color = new Color(0f, 0f, 0f, 0.62f);
+
+        VerticalLayoutGroup layout = runtimeSubtitlePanel.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(24, 24, 18, 18);
+        layout.spacing = 6f;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = true;
+
+        ContentSizeFitter fitter = runtimeSubtitlePanel.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        subtitleSpeakerText = CreateSubtitleText("Speaker", runtimeSubtitlePanel.transform, subtitleSpeakerFontSize, FontStyles.Bold);
+        subtitleBodyText = CreateSubtitleText("Body", runtimeSubtitlePanel.transform, subtitleBodyFontSize, FontStyles.Normal);
+        subtitleBodyText.enableWordWrapping = true;
+        ApplySubtitleAppearance();
+
+        subtitleSpeakerText.gameObject.SetActive(false);
+        subtitleBodyText.gameObject.SetActive(false);
+        runtimeSubtitlePanel.SetActive(false);
+    }
+
+    private TextMeshProUGUI CreateSubtitleText(string objectName, Transform parent, float fontSize, FontStyles fontStyle)
+    {
+        GameObject textObject = new GameObject("TTS Subtitle " + objectName);
+        textObject.transform.SetParent(parent, false);
+
+        TextMeshProUGUI text = textObject.AddComponent<TextMeshProUGUI>();
+        text.fontSize = fontSize;
+        text.fontStyle = fontStyle;
+        text.color = Color.white;
+        text.alignment = TextAlignmentOptions.BottomLeft;
+        text.text = string.Empty;
+
+        RectTransform rect = text.rectTransform;
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = Vector2.zero;
+
+        LayoutElement layoutElement = textObject.AddComponent<LayoutElement>();
+        layoutElement.minHeight = fontSize + 8f;
+
+        return text;
+    }
+
+    private void ShowSubtitle(string role, string replyText, float clipLength)
+    {
+        if (!enableSubtitles)
+        {
+            return;
+        }
+
+        EnsureSubtitleUi();
+        if (subtitleSpeakerText == null || subtitleBodyText == null)
+        {
+            return;
+        }
+
+        string cleanText = string.IsNullOrWhiteSpace(replyText) ? string.Empty : TrimSubtitleText(replyText);
+        if (string.IsNullOrEmpty(cleanText))
+        {
+            ClearSubtitle();
+            return;
+        }
+
+        if (subtitleCoroutine != null)
+        {
+            StopCoroutine(subtitleCoroutine);
+        }
+
+        if (runtimeSubtitlePanel != null)
+        {
+            runtimeSubtitlePanel.SetActive(true);
+        }
+
+        subtitleSpeakerText.gameObject.SetActive(true);
+        subtitleBodyText.gameObject.SetActive(true);
+        ApplySubtitleAppearance();
+        subtitleSpeakerText.text = GetSpeakerDisplayName(role);
+        subtitleBodyText.text = string.Empty;
+
+        subtitleCoroutine = StartCoroutine(TypeSubtitleRoutine(cleanText, clipLength));
+    }
+
+    private IEnumerator TypeSubtitleRoutine(string fullText, float clipLength)
+    {
+        if (!typewriterSubtitles)
+        {
+            subtitleBodyText.text = fullText;
+            subtitleCoroutine = null;
+            yield break;
+        }
+
+        float safeClipLength = Mathf.Max(0.01f, clipLength);
+        float charactersPerSecondFromClip = fullText.Length / safeClipLength;
+        float charactersPerSecond = Mathf.Max(minimumSubtitleCharactersPerSecond, charactersPerSecondFromClip);
+        float visibleCharacters = 0f;
+
+        while (visibleCharacters < fullText.Length)
+        {
+            visibleCharacters += charactersPerSecond * Time.deltaTime;
+            int count = Mathf.Clamp(Mathf.FloorToInt(visibleCharacters), 0, fullText.Length);
+            subtitleBodyText.text = fullText.Substring(0, count);
+            yield return null;
+        }
+
+        subtitleBodyText.text = fullText;
+        subtitleCoroutine = null;
+    }
+
+    private void ClearSubtitle()
+    {
+        if (subtitleCoroutine != null)
+        {
+            StopCoroutine(subtitleCoroutine);
+            subtitleCoroutine = null;
+        }
+
+        if (subtitleSpeakerText != null)
+        {
+            subtitleSpeakerText.text = string.Empty;
+            subtitleSpeakerText.gameObject.SetActive(false);
+        }
+
+        if (subtitleBodyText != null)
+        {
+            subtitleBodyText.text = string.Empty;
+            subtitleBodyText.gameObject.SetActive(false);
+        }
+
+        if (runtimeSubtitlePanel != null)
+        {
+            runtimeSubtitlePanel.SetActive(false);
+        }
+    }
+
+    private string GetSpeakerDisplayName(string role)
+    {
+        string safeRole = string.IsNullOrWhiteSpace(role) ? "speaker" : role.Trim();
+
+        if (speakerDisplayNames != null)
+        {
+            for (int i = 0; i < speakerDisplayNames.Length; i++)
+            {
+                SpeakerDisplayName entry = speakerDisplayNames[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.role))
+                {
+                    continue;
+                }
+
+                if (string.Equals(entry.role.Trim(), safeRole, StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.IsNullOrWhiteSpace(entry.displayName) ? HumanizeRoleName(safeRole) : entry.displayName.Trim();
+                }
+            }
+        }
+
+        return HumanizeRoleName(safeRole);
+    }
+
+    private string HumanizeRoleName(string role)
+    {
+        string normalized = role.Replace("_", " ").Replace("-", " ").Trim();
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return "Speaker";
+        }
+
+        string[] parts = normalized.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string lower = parts[i].ToLowerInvariant();
+            parts[i] = char.ToUpperInvariant(lower[0]) + lower.Substring(1);
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private void ApplySubtitleAppearance()
+    {
+        if (subtitleSpeakerText != null)
+        {
+            subtitleSpeakerText.fontSize = Mathf.Max(8f, subtitleSpeakerFontSize);
+
+            LayoutElement speakerLayout = subtitleSpeakerText.GetComponent<LayoutElement>();
+            if (speakerLayout != null)
+            {
+                speakerLayout.minHeight = subtitleSpeakerText.fontSize + 8f;
+            }
+        }
+
+        if (subtitleBodyText != null)
+        {
+            subtitleBodyText.fontSize = Mathf.Max(8f, subtitleBodyFontSize);
+
+            LayoutElement bodyLayout = subtitleBodyText.GetComponent<LayoutElement>();
+            if (bodyLayout != null)
+            {
+                bodyLayout.minHeight = subtitleBodyText.fontSize + 8f;
+            }
+        }
+    }
+
+    private string TrimSubtitleText(string replyText)
+    {
+        string cleanText = string.IsNullOrWhiteSpace(replyText) ? string.Empty : replyText.Trim();
+        int safeMaxCharacters = Mathf.Max(20, maxSubtitleCharacters);
+
+        if (cleanText.Length <= safeMaxCharacters)
+        {
+            return cleanText;
+        }
+
+        int cutoff = cleanText.LastIndexOf(' ', safeMaxCharacters);
+        if (cutoff < safeMaxCharacters / 2)
+        {
+            cutoff = safeMaxCharacters;
+        }
+
+        return cleanText.Substring(0, cutoff).TrimEnd() + "...";
     }
 
     // -------------------------

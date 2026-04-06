@@ -102,6 +102,11 @@ public class NPC : Interactable
     [Tooltip("Strength of the Always Ghost breathing pulse.")]
     [SerializeField, Range(0f, 0.5f)] private float alwaysGhostPulseAmplitude = 0.08f;
 
+    [Header("Optional AI Debate")]
+    [Tooltip("Optional debate battle component. If present and allowed, interaction can start AI conversation battle instead of normal flow.")]
+    [SerializeField] private NPCDebateBattle debateBattle;
+    public NPCDebateBattle DebateBattle => debateBattle;
+
     [Header("Movement Settings")]
     [SerializeField] private float stoppingDistance = 2.5f;
 
@@ -136,6 +141,11 @@ public class NPC : Interactable
         if (spriteRenderer == null)
         {
             spriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
+        }
+
+        if (debateBattle == null)
+        {
+            debateBattle = GetComponent<NPCDebateBattle>();
         }
 
         nextWalkFrameTime = Time.time;
@@ -314,7 +324,15 @@ public class NPC : Interactable
     {
         Debug.Log($"NPC.Interact called. isFollowing={isFollowing}, isDead={isDead}, currentHealth={currentHealth}, maxHealth={maxHealth}, healthRatio={(maxHealth > 0f ? currentHealth / maxHealth : 0f)}, threshold={dialogueHealthThreshold}, isCombatActive={isCombatActive}");
 
-        // Already allied NPC should not re-open dialogue/combat.
+        // Optional branch: AI debate battle sequence (room-based / component-based).
+        // This intentionally runs before the following-state early return so the
+        // player can trigger debate again while the NPC is following (zone-gated).
+        if (debateBattle != null && debateBattle.TryStartDebateFromInteract())
+        {
+            return;
+        }
+
+        // Already allied NPC should not re-open normal dialogue/combat.
         if (isFollowing || isDead) return;
 
         if (IsAtDialogueThreshold())
@@ -509,6 +527,4 @@ public class NPC : Interactable
         return currentHealth <= (maxHealth * dialogueHealthThreshold) + DialogueThresholdEpsilon;
     }
 }
-
-
 

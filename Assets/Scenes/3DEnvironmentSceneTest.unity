@@ -30066,6 +30066,7 @@ GameObject:
   - component: {fileID: 1268416606}
   - component: {fileID: 1268416605}
   - component: {fileID: 1268416604}
+  - component: {fileID: 1268416611}
   m_Layer: 6
   m_Name: NPC
   m_TagString: Target
@@ -30163,12 +30164,13 @@ MonoBehaviour:
   injuredBlueFluctuationSpeed: 1.2
   injuredBlueMaxBlend: 0.6
   persistFlickerAfterHit: 1
-  alwaysGhost: 0
+  alwaysGhost: 1
   alwaysGhostBaseTint: {r: 0.82, g: 0.76, b: 0.7, a: 1}
   alwaysGhostBaseAlpha: 0.78
   alwaysGhostBreathingPulse: 1
   alwaysGhostPulseSpeed: 1.5
   alwaysGhostPulseAmplitude: 0.08
+  debateBattle: {fileID: 0}
   stoppingDistance: 2.5
   moveSpeed: 2
   changeDirInterval: 2
@@ -30261,7 +30263,7 @@ Transform:
   m_GameObject: {fileID: 1268416603}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 269.8, y: 1.07, z: 256.16998}
+  m_LocalPosition: {x: 269.8, y: 1.13, z: 256.17}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -30271,6 +30273,49 @@ Transform:
   - {fileID: 1087743144}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1268416611
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1268416603}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8913747ad7f580e40b9b81dc5f724c01, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NPCDebateBattle
+  enableDebateBattle: 0
+  npc: {fileID: 0}
+  requiredRoomZone: {fileID: 0}
+  allowWhileFollowing: 1
+  debateAnywhereWhileFollowing: 1
+  playerTurnMode: 2
+  choiceInputTimeoutSeconds: 8
+  defaultChoiceIndex: 0
+  choiceOptions: []
+  fastPresetPlayerLines:
+  - Breathe. I'm here.
+  - You are not back there. You are here.
+  - Look at me. Stay in this room.
+  fastPresetInsanityDelta: -12
+  fastPresetCalmPointDelta: 1
+  rounds: 3
+  calmPointsToWin: 2
+  betweenTurnsDelay: 0.3
+  endTextHoldSeconds: 1.2
+  soldierInsanityStart: 35
+  soldierInsanityPerRound: 20
+  openingText: The air tightens. This will be a battle of words.
+  soldierFallbackLine: You don't understand what I saw.
+  playerFallbackLine: I hear you. You're not alone right now.
+  makeSoldierFollowOnWin: 1
+  resumeCombatOnLoss: 1
+  winLine: The soldier's breathing steadies. He lowers his weapon.
+  lossLine: The soldier snaps back into survival panic.
+  lockPlayerScriptsDuringDebate: 0
+  playerScriptsToDisable: []
+  aiReplyTimeoutSeconds: 20
 --- !u!1001 &1274619938
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -44191,7 +44236,23 @@ MonoBehaviour:
   fastReplyMaxChars: 220
   normalReplyMaxChars: 400
   fastMaxSpeakerReferences: 1
-  normalMaxSpeakerReferences: 2
+  normalMaxSpeakerReferences: 3
+  enableSubtitles: 1
+  subtitleSpeakerText: {fileID: 0}
+  subtitleBodyText: {fileID: 0}
+  typewriterSubtitles: 1
+  minimumSubtitleCharactersPerSecond: 18
+  subtitlePadding: 24
+  subtitleSpeakerFontSize: 14
+  subtitleBodyFontSize: 18
+  maxSubtitleCharacters: 260
+  speakerDisplayNames:
+  - role: soldier
+    displayName: Soldier
+  - role: player
+    displayName: You
+  - role: mad_god
+    displayName: Mad God
   requestTimeoutSeconds: 120
 --- !u!4 &1928920356
 Transform:
