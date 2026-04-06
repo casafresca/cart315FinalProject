@@ -30285,7 +30285,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8913747ad7f580e40b9b81dc5f724c01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPCDebateBattle
-  enableDebateBattle: 1
+  enableDebateBattle: 0
   npc: {fileID: 0}
   requiredRoomZone: {fileID: 0}
   allowWhileFollowing: 1
@@ -44236,7 +44236,23 @@ MonoBehaviour:
   fastReplyMaxChars: 220
   normalReplyMaxChars: 400
   fastMaxSpeakerReferences: 1
-  normalMaxSpeakerReferences: 2
+  normalMaxSpeakerReferences: 3
+  enableSubtitles: 1
+  subtitleSpeakerText: {fileID: 0}
+  subtitleBodyText: {fileID: 0}
+  typewriterSubtitles: 1
+  minimumSubtitleCharactersPerSecond: 18
+  subtitlePadding: 24
+  subtitleSpeakerFontSize: 14
+  subtitleBodyFontSize: 18
+  maxSubtitleCharacters: 260
+  speakerDisplayNames:
+  - role: soldier
+    displayName: Soldier
+  - role: player
+    displayName: You
+  - role: mad_god
+    displayName: Mad God
   requestTimeoutSeconds: 120
 --- !u!4 &1928920356
 Transform:
