@@ -130,26 +130,14 @@ public class TTSRunner : MonoBehaviour
         StartPython();
     }
 
+    public void TriggerSpeak(string textToSay)
+    {
+        if (!isReady) Debug.LogWarning("[TTS] Not ready yet!");
+        else if (isSpeaking) Debug.LogWarning("[TTS] Already speaking!");
+        else Speak(textToSay);
+    }
     void Update()
     {
-        if (Input.GetKeyDown(triggerKey))
-        {
-            Debug.Log("[TTS] E pressed");
-
-            if (!isReady)
-            {
-                Debug.LogWarning("[TTS] Not ready yet!");
-            }
-            else if (isSpeaking)
-            {
-                Debug.LogWarning("[TTS] Already speaking!");
-            }
-            else
-            {
-                Speak(testLine);
-            }
-        }
-
         DrainQueues();
     }
 
@@ -171,15 +159,11 @@ public class TTSRunner : MonoBehaviour
     {
         Debug.Log("[TTS] Launching Python process...");
 
-        if (!File.Exists(scriptPath))
-        {
-            Debug.LogError("[TTS] Script not found: " + scriptPath);
-            return;
-        }
+        if (!File.Exists(scriptPath)) return;
 
-        Debug.Log($"[TTS] EXE: {pythonExe}");
-        Debug.Log($"[TTS] ARGS: -u \"{scriptPath}\" --out-dir \"{wavDir}\"");
-        Debug.Log($"[TTS] WorkingDir: {ttsRoot}");
+        // Debug.Log($"[TTS] EXE: {pythonExe}");
+        // Debug.Log($"[TTS] ARGS: -u \"{scriptPath}\" --out-dir \"{wavDir}\"");
+        // Debug.Log($"[TTS] WorkingDir: {ttsRoot}");
         if (process != null && !process.HasExited) return;
 
         Debug.Log("Starting Python TTS...");
@@ -303,14 +287,8 @@ public class TTSRunner : MonoBehaviour
 
                 Debug.Log($"[TTS] Processing response for ID {id}...");
 
-                try
-                {
-                    response = JsonUtility.FromJson<TTSResponse>(line);
-                }
-                catch
-                {
-                    continue;
-                }
+                try { response = JsonUtility.FromJson<TTSResponse>(line); }
+                catch { continue; }
 
                 if (response == null || response.id != id)
                 {
@@ -369,8 +347,7 @@ public class TTSRunner : MonoBehaviour
             Debug.Log("[PY STDOUT] " + line);
 
             // Try READY first
-            if (TryHandleReady(line))
-                continue;
+            if (TryHandleReady(line)) continue;
 
             // If it's a result message, store it for SpeakRoutine
             if (line.Contains("\"type\""))
@@ -379,9 +356,7 @@ public class TTSRunner : MonoBehaviour
                 {
                     var response = JsonUtility.FromJson<TTSResponse>(line);
                     if (response != null && (response.type == "result" || response.type == "error"))
-                    {
                         resultQueue.Enqueue(line);
-                    }
                 }
                 catch { }
             }
@@ -484,9 +459,7 @@ public class TTSRunner : MonoBehaviour
     private void EnsureSubtitleUi()
     {
         if (!enableSubtitles)
-        {
             return;
-        }
 
         if (subtitleSpeakerText != null && subtitleBodyText != null)
         {
@@ -499,9 +472,7 @@ public class TTSRunner : MonoBehaviour
         }
 
         if (runtimeSubtitlePanel != null && subtitleSpeakerText != null && subtitleBodyText != null)
-        {
             return;
-        }
 
         Canvas existingCanvas = FindObjectOfType<Canvas>();
         if (existingCanvas == null)
@@ -550,7 +521,7 @@ public class TTSRunner : MonoBehaviour
 
     private TextMeshProUGUI CreateSubtitleText(string objectName, Transform parent, float fontSize, FontStyles fontStyle)
     {
-        GameObject textObject = new GameObject("TTS Subtitle " + objectName);
+        GameObject textObject = new("TTS Subtitle " + objectName);
         textObject.transform.SetParent(parent, false);
 
         TextMeshProUGUI text = textObject.AddComponent<TextMeshProUGUI>();
@@ -575,15 +546,11 @@ public class TTSRunner : MonoBehaviour
     private void ShowSubtitle(string role, string replyText, float clipLength)
     {
         if (!enableSubtitles)
-        {
             return;
-        }
 
         EnsureSubtitleUi();
         if (subtitleSpeakerText == null || subtitleBodyText == null)
-        {
             return;
-        }
 
         string cleanText = string.IsNullOrWhiteSpace(replyText) ? string.Empty : TrimSubtitleText(replyText);
         if (string.IsNullOrEmpty(cleanText))
@@ -593,14 +560,10 @@ public class TTSRunner : MonoBehaviour
         }
 
         if (subtitleCoroutine != null)
-        {
             StopCoroutine(subtitleCoroutine);
-        }
 
         if (runtimeSubtitlePanel != null)
-        {
             runtimeSubtitlePanel.SetActive(true);
-        }
 
         subtitleSpeakerText.gameObject.SetActive(true);
         subtitleBodyText.gameObject.SetActive(true);
@@ -658,9 +621,7 @@ public class TTSRunner : MonoBehaviour
         }
 
         if (runtimeSubtitlePanel != null)
-        {
             runtimeSubtitlePanel.SetActive(false);
-        }
     }
 
     private string GetSpeakerDisplayName(string role)
@@ -672,15 +633,10 @@ public class TTSRunner : MonoBehaviour
             for (int i = 0; i < speakerDisplayNames.Length; i++)
             {
                 SpeakerDisplayName entry = speakerDisplayNames[i];
-                if (entry == null || string.IsNullOrWhiteSpace(entry.role))
-                {
-                    continue;
-                }
+                if (entry == null || string.IsNullOrWhiteSpace(entry.role)) continue;
 
                 if (string.Equals(entry.role.Trim(), safeRole, StringComparison.OrdinalIgnoreCase))
-                {
                     return string.IsNullOrWhiteSpace(entry.displayName) ? HumanizeRoleName(safeRole) : entry.displayName.Trim();
-                }
             }
         }
 
@@ -691,9 +647,7 @@ public class TTSRunner : MonoBehaviour
     {
         string normalized = role.Replace("_", " ").Replace("-", " ").Trim();
         if (string.IsNullOrEmpty(normalized))
-        {
             return "Speaker";
-        }
 
         string[] parts = normalized.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
         for (int i = 0; i < parts.Length; i++)
@@ -713,9 +667,7 @@ public class TTSRunner : MonoBehaviour
 
             LayoutElement speakerLayout = subtitleSpeakerText.GetComponent<LayoutElement>();
             if (speakerLayout != null)
-            {
                 speakerLayout.minHeight = subtitleSpeakerText.fontSize + 8f;
-            }
         }
 
         if (subtitleBodyText != null)
@@ -724,9 +676,7 @@ public class TTSRunner : MonoBehaviour
 
             LayoutElement bodyLayout = subtitleBodyText.GetComponent<LayoutElement>();
             if (bodyLayout != null)
-            {
                 bodyLayout.minHeight = subtitleBodyText.fontSize + 8f;
-            }
         }
     }
 
@@ -736,15 +686,11 @@ public class TTSRunner : MonoBehaviour
         int safeMaxCharacters = Mathf.Max(20, maxSubtitleCharacters);
 
         if (cleanText.Length <= safeMaxCharacters)
-        {
             return cleanText;
-        }
 
         int cutoff = cleanText.LastIndexOf(' ', safeMaxCharacters);
         if (cutoff < safeMaxCharacters / 2)
-        {
             cutoff = safeMaxCharacters;
-        }
 
         return cleanText.Substring(0, cutoff).TrimEnd() + "...";
     }

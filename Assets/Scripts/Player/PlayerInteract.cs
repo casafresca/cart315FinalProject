@@ -72,7 +72,7 @@ public class PlayerInteract : MonoBehaviour
 
                     if (TTSRunner.Instance != null)
                     {
-                        TTSRunner.Instance.TriggerSpeak();
+                        TTSRunner.Instance.TriggerSpeak("Who are you?");
                     }
                 }
             }
