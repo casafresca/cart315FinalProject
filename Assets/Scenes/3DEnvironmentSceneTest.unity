@@ -30135,7 +30135,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c5286f974ffbcc4e902b4c2041da1d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NPC
-  promptMessage: Talk to User (click "O")
+  promptMessage: Talk to User (click "F")
   inkJSON: {fileID: 4900000, guid: b94213739e980fe4dac6e77e54eee852, type: 3}
   isFollowing: 0
   isCombatActive: 0
