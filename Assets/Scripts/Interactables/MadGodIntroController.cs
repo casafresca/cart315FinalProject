@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using TMPro;
@@ -84,6 +85,12 @@ public class MadGodIntroController : MonoBehaviour
     [Header("Optional Subtitles")]
     [SerializeField] private TextMeshProUGUI subtitleText;
     [SerializeField] private string[] subtitleLines;
+    [Tooltip("Optional transcript text file. If empty, the controller will try StreamingAssets/TTS/wavs/madGodTranscript.txt.")]
+    [SerializeField] private TextAsset subtitleTranscriptAsset;
+    [SerializeField] private string subtitleTranscriptStreamingAssetsRelativePath = "TTS/wavs/madGodTranscript.txt";
+    [SerializeField] private bool typewriterSubtitles = true;
+    [SerializeField] private float minimumSubtitleCharactersPerSecond = 18f;
+    [SerializeField] private float subtitleFontSize = 26f;
 
     [Header("Player Lock")]
     [Tooltip("Scripts disabled while intro is running (InputManager, Weapon, etc).")]
@@ -100,9 +107,16 @@ public class MadGodIntroController : MonoBehaviour
     private Transform runtimeRetreatTarget;
     private Vector3 playerStartPositionAtIntroStart;
     private PlayerLook cachedPlayerLook;
+    private GameObject runtimeSubtitleRoot;
+    private Coroutine subtitleTypewriterRoutine;
 
     private void Start()
     {
+        if (playOnce && TherapySessionState.HasCompletedMadGodIntro)
+        {
+            hasPlayed = true;
+        }
+
         if (player == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
@@ -127,9 +141,16 @@ public class MadGodIntroController : MonoBehaviour
             framingSpriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
         }
 
+        EnsureSubtitleTextExists();
+
         if ((introClips == null || introClips.Length == 0) && autoLoadClipsFromResources)
         {
             TryAutoLoadIntroClips();
+        }
+
+        if ((subtitleLines == null || subtitleLines.Length == 0))
+        {
+            subtitleLines = LoadSubtitleLinesFromTranscript();
         }
 
         if (retreatTarget == null && useStartPositionAsRetreatIfMissing)
@@ -147,6 +168,7 @@ public class MadGodIntroController : MonoBehaviour
 
         if (subtitleText != null)
         {
+            subtitleText.fontSize = subtitleFontSize;
             subtitleText.text = string.Empty;
             subtitleText.gameObject.SetActive(false);
         }
@@ -161,6 +183,7 @@ public class MadGodIntroController : MonoBehaviour
     public void StartIntro()
     {
         if (introRunning) return;
+        if (playOnce && TherapySessionState.HasCompletedMadGodIntro) return;
         if (playOnce && hasPlayed) return;
         StartCoroutine(IntroRoutine());
     }
@@ -299,6 +322,7 @@ public class MadGodIntroController : MonoBehaviour
         SetPlayerLocked(false);
 
         hasPlayed = true;
+        TherapySessionState.MarkMadGodIntroCompleted();
         introRunning = false;
     }
 
@@ -416,19 +440,34 @@ public class MadGodIntroController : MonoBehaviour
         if (subtitleText == null) return;
 
         subtitleText.gameObject.SetActive(true);
+        subtitleText.fontSize = subtitleFontSize;
+
+        string line = string.Empty;
         if (subtitleLines != null && clipIndex >= 0 && clipIndex < subtitleLines.Length)
         {
-            subtitleText.text = subtitleLines[clipIndex];
+            line = subtitleLines[clipIndex];
         }
-        else
+
+        if (subtitleTypewriterRoutine != null)
         {
-            subtitleText.text = string.Empty;
+            StopCoroutine(subtitleTypewriterRoutine);
+            subtitleTypewriterRoutine = null;
         }
+
+        subtitleText.text = string.Empty;
+        subtitleTypewriterRoutine = StartCoroutine(TypeSubtitleRoutine(line, clipIndex));
     }
 
     private void HideSubtitle()
     {
         if (subtitleText == null) return;
+
+        if (subtitleTypewriterRoutine != null)
+        {
+            StopCoroutine(subtitleTypewriterRoutine);
+            subtitleTypewriterRoutine = null;
+        }
+
         subtitleText.text = string.Empty;
         subtitleText.gameObject.SetActive(false);
     }
@@ -474,6 +513,121 @@ public class MadGodIntroController : MonoBehaviour
 
         introClips = ordered.ToArray();
         Debug.Log($"MadGodIntroController: Auto-loaded {introClips.Length} intro clips from Resources/{introClipsResourcesPath}");
+    }
+
+    private void EnsureSubtitleTextExists()
+    {
+        if (subtitleText != null)
+        {
+            return;
+        }
+
+        Canvas canvas = FindObjectOfType<Canvas>(true);
+        if (canvas == null)
+        {
+            Debug.LogWarning("MadGodIntroController: No Canvas found for runtime subtitles.");
+            return;
+        }
+
+        runtimeSubtitleRoot = new GameObject("MadGodIntroSubtitles", typeof(RectTransform));
+        runtimeSubtitleRoot.transform.SetParent(canvas.transform, false);
+
+        RectTransform rootRect = runtimeSubtitleRoot.GetComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0.1f, 0f);
+        rootRect.anchorMax = new Vector2(0.9f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0f);
+        rootRect.anchoredPosition = new Vector2(0f, 36f);
+        rootRect.sizeDelta = new Vector2(0f, 120f);
+
+        subtitleText = runtimeSubtitleRoot.AddComponent<TextMeshProUGUI>();
+        subtitleText.text = string.Empty;
+        subtitleText.fontSize = subtitleFontSize;
+        subtitleText.alignment = TextAlignmentOptions.Bottom;
+        subtitleText.enableWordWrapping = true;
+        subtitleText.color = Color.white;
+        subtitleText.outlineWidth = 0.2f;
+        subtitleText.outlineColor = new Color(0f, 0f, 0f, 1f);
+        subtitleText.gameObject.SetActive(false);
+    }
+
+    private string[] LoadSubtitleLinesFromTranscript()
+    {
+        string transcriptText = string.Empty;
+
+        if (subtitleTranscriptAsset != null)
+        {
+            transcriptText = subtitleTranscriptAsset.text;
+        }
+        else
+        {
+            string transcriptPath = Path.Combine(Application.streamingAssetsPath, subtitleTranscriptStreamingAssetsRelativePath);
+            if (File.Exists(transcriptPath))
+            {
+                transcriptText = File.ReadAllText(transcriptPath);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(transcriptText))
+        {
+            Debug.LogWarning("MadGodIntroController: No transcript file found for intro subtitles.");
+            return System.Array.Empty<string>();
+        }
+
+        string normalized = transcriptText.Replace("\r\n", "\n").Trim();
+        string[] blocks = Regex.Split(normalized, "\n\\s*\n");
+        List<string> cleanedLines = new List<string>();
+
+        for (int i = 0; i < blocks.Length; i++)
+        {
+            string line = blocks[i].Replace("\n", " ").Trim();
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                cleanedLines.Add(line);
+            }
+        }
+
+        Debug.Log($"MadGodIntroController: Loaded {cleanedLines.Count} subtitle lines from transcript.");
+        return cleanedLines.ToArray();
+    }
+
+    private IEnumerator TypeSubtitleRoutine(string fullText, int clipIndex)
+    {
+        if (string.IsNullOrWhiteSpace(fullText))
+        {
+            subtitleText.text = string.Empty;
+            subtitleTypewriterRoutine = null;
+            yield break;
+        }
+
+        AudioClip clip = null;
+        if (introClips != null && clipIndex >= 0 && clipIndex < introClips.Length)
+        {
+            clip = introClips[clipIndex];
+        }
+
+        if (!typewriterSubtitles)
+        {
+            subtitleText.text = fullText;
+            subtitleTypewriterRoutine = null;
+            yield break;
+        }
+
+        float clipLength = clip != null ? clip.length : 0f;
+        float safeClipLength = Mathf.Max(0.01f, clipLength);
+        float charactersPerSecondFromClip = fullText.Length / safeClipLength;
+        float charactersPerSecond = Mathf.Max(minimumSubtitleCharactersPerSecond, charactersPerSecondFromClip);
+        float visibleCharacters = 0f;
+
+        while (visibleCharacters < fullText.Length)
+        {
+            visibleCharacters += charactersPerSecond * Time.deltaTime;
+            int count = Mathf.Clamp(Mathf.FloorToInt(visibleCharacters), 0, fullText.Length);
+            subtitleText.text = fullText.Substring(0, count);
+            yield return null;
+        }
+
+        subtitleText.text = fullText;
+        subtitleTypewriterRoutine = null;
     }
 
     private static int ExtractFirstNumber(string input)

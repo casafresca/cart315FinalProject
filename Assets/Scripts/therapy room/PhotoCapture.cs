@@ -26,6 +26,8 @@ public class PhotoCapture : MonoBehaviour
 
     [Header("Ending Sequence")]
     [SerializeField] private Sprite[] endingPhotoSprites;
+    [SerializeField] private Sprite galleryBackdropSprite;
+    [SerializeField] private Color galleryBackdropColor = Color.white;
     [SerializeField] private Sprite emptyBoardSprite;
     [SerializeField] private Sprite[] completedBoardSprites;
     [SerializeField] private float capturedPhotoHoldSeconds = 1.1f;
@@ -289,25 +291,7 @@ public class PhotoCapture : MonoBehaviour
     private IEnumerator PlayEndingSequence()
     {
         yield return new WaitForSeconds(Mathf.Max(0f, capturedPhotoHoldSeconds));
-
-        if (emptyBoardSprite != null)
-        {
-            ShowBoardSprite(emptyBoardSprite);
-            yield return new WaitForSeconds(Mathf.Max(0f, emptyBoardHoldSeconds));
-        }
-
-        if (capturedPhotoSprite != null)
-        {
-            yield return StartCoroutine(AnimatePhotoPlacement());
-        }
-
-        Sprite completedBoardSprite = GetCompletedBoardSprite();
-        if (completedBoardSprite != null)
-        {
-            ShowBoardSprite(completedBoardSprite);
-            yield return new WaitForSeconds(Mathf.Max(0f, completedBoardHoldSeconds));
-        }
-
+        QueueMainSceneGalleryReveal();
         StartReturnCountdown();
         endingSequenceRoutine = null;
     }
@@ -334,6 +318,49 @@ public class PhotoCapture : MonoBehaviour
         int predictedCount = Mathf.Max(1, TherapySessionState.CapturedSoldierCount + 1);
         int index = Mathf.Clamp(predictedCount - 1, 0, endingPhotoSprites.Length - 1);
         return endingPhotoSprites[index];
+    }
+
+    private void QueueMainSceneGalleryReveal()
+    {
+        Sprite completedBoardSprite = GetCompletedBoardSprite();
+        string returnSceneName = TherapySessionState.HasReturnPoint
+            ? TherapySessionState.ReturnSceneName
+            : fallbackReturnSceneName;
+        Sprite backdropSprite = galleryBackdropSprite != null
+            ? galleryBackdropSprite
+            : BuildBackdropSpriteFromOverlayTexture();
+
+        TherapySessionState.QueueGalleryReveal(
+            returnSceneName,
+            backdropSprite,
+            galleryBackdropColor,
+            emptyBoardSprite,
+            completedBoardSprite,
+            emptyBoardHoldSeconds,
+            photoPlaceDuration,
+            completedBoardHoldSeconds);
+    }
+
+    private Sprite BuildBackdropSpriteFromOverlayTexture()
+    {
+        if (photoOverlayTexture == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Sprite.Create(
+                photoOverlayTexture,
+                new Rect(0f, 0f, photoOverlayTexture.width, photoOverlayTexture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+        }
+        catch (UnityException)
+        {
+            Debug.LogWarning("[PhotoCapture] Could not build gallery backdrop sprite from photoOverlayTexture.");
+            return null;
+        }
     }
 
     private void RemovePhoto()
