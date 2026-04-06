@@ -117,12 +117,25 @@ public class NPC : Interactable
     private float moveTimer;
     private const float DialogueThresholdEpsilon = 0.0001f;
 
+    // --- NEW MEMORY VARIABLES ---
+    private Vector3 startPosition;
+    private Quaternion startRotation;
+    private bool initialCombatState;
+
     void Start()
     {
+        // --- NEW: Save original state ---
+        startPosition = transform.position;
+        startRotation = transform.rotation;
+        initialCombatState = isCombatActive; // Remember if they started hostile or peaceful
+
+        // --- NEW: Listen for player respawn ---
+        PlayerHealth.OnPlayerRespawn += ResetNPC;
+
         // Initialize health and start with gun hidden.
         currentHealth = maxHealth;
         isHitFlickerActive = false;
-        if (npcGun != null) npcGun.SetActive(false);
+        if (npcGun != null) npcGun.SetActive(isCombatActive); // Set based on initial state
 
         agent = GetComponent<NavMeshAgent>();
         rb = GetComponent<Rigidbody>();
@@ -151,6 +164,59 @@ public class NPC : Interactable
         nextWalkFrameTime = Time.time;
         UpdateVisualState();
         UpdateColorEffects();
+    }
+
+    // --- NEW: Stop listening if destroyed ---
+    void OnDestroy()
+    {
+        PlayerHealth.OnPlayerRespawn -= ResetNPC;
+    }
+
+    // --- NEW: The Reset Function ---
+    public void ResetNPC()
+    {
+        // 1. Turn off NavMeshAgent if it was following
+        if (agent != null && agent.enabled)
+        {
+            agent.isStopped = true;
+            agent.ResetPath();
+            agent.enabled = false;
+        }
+
+        // 2. Reset Physics/Collision
+        if (rb != null)
+        {
+            rb.isKinematic = false; // Undo the kinematic lock from StartFollowing()
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        // Re-enable collisions with player if they were following
+        if (playerTransform != null)
+        {
+            Collider pCol = playerTransform.GetComponent<Collider>();
+            Collider nCol = GetComponent<Collider>();
+            if (pCol != null && nCol != null) Physics.IgnoreCollision(nCol, pCol, false);
+        }
+
+        // 3. Teleport back to start
+        transform.position = startPosition;
+        transform.rotation = startRotation;
+
+        // 4. Reset all stats and states
+        currentHealth = maxHealth;
+        isDead = false;
+        isFollowing = false;
+        isCombatActive = initialCombatState;
+        isHitFlickerActive = false;
+        moveDirection = Vector3.zero;
+
+        // 5. Reset visuals
+        if (npcGun != null) npcGun.SetActive(isCombatActive);
+        UpdateVisualState();
+        UpdateColorEffects();
+
+        Debug.Log($"NPC {gameObject.name} fully reset to starting state.");
     }
 
     void Update()

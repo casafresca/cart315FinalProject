@@ -41,11 +41,13 @@ public class Bullet : MonoBehaviour
         }
 
         // 3. Check if we hit the Player
-        if (collision.gameObject.CompareTag("Player"))
+        // Look for the custom PlayerHitbox script on the object we hit
+        PlayerHitbox hitbox = collision.gameObject.GetComponent<PlayerHitbox>();
+
+        if (hitbox != null)
         {
-            // If you implement a PlayerHealth script later, call it here:
-            // collision.gameObject.GetComponent<PlayerHealth>()?.TakeDamage(damageAmount);
-            Debug.Log("Player hit by bullet!");
+            // Apply the damage. The PlayerHealth script will handle the console logs and respawning!
+            hitbox.ApplyDamage(damageAmount);
         }
 
         // 4. Always destroy the bullet on impact with anything else (walls, floors, etc.)
