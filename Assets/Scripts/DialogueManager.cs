@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using TMPro;
 using Ink.Runtime;
@@ -26,6 +27,10 @@ public class DialogueManager : MonoBehaviour
 
     private Story currentStory;
     private bool externalDialogueSession;
+    private Action<int> externalChoiceCallback;
+    private bool externalGeneratedChoiceSession;
+    private Action<int> externalGeneratedChoiceCallback;
+    [SerializeField] private GameObject[] generatedChoiceButtons;
 
     // This is the variable your Weapon script checks
     public bool dialogueIsPlaying { get; private set; }
@@ -65,6 +70,7 @@ public class DialogueManager : MonoBehaviour
 
         dialogueIsPlaying = true;
         externalDialogueSession = true;
+        externalChoiceCallback = null;
 
         if (dialoguePanel != null) dialoguePanel.SetActive(true);
         if (dialogueText != null) dialogueText.text = openingText ?? string.Empty;
@@ -83,6 +89,49 @@ public class DialogueManager : MonoBehaviour
         return true;
     }
 
+    public bool BeginExternalChoiceSession(string prompt, string[] optionTexts, Action<int> choiceCallback)
+    {
+        if (dialogueIsPlaying)
+        {
+            return false;
+        }
+
+        if (optionTexts == null)
+        {
+            optionTexts = new string[0];
+        }
+
+        dialogueIsPlaying = true;
+        externalDialogueSession = true;
+        externalChoiceCallback = choiceCallback;
+
+        if (dialoguePanel != null) dialoguePanel.SetActive(true);
+        if (dialogueText != null) dialogueText.text = prompt ?? string.Empty;
+        if (continueButton != null) continueButton.SetActive(false);
+
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] == null) continue;
+                if (i < optionTexts.Length)
+                {
+                    choices[i].SetActive(true);
+                    TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
+                    if (txt != null) txt.text = optionTexts[i];
+                }
+                else
+                {
+                    choices[i].SetActive(false);
+                }
+            }
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        return true;
+    }
+
     public void SetExternalDialogueText(string text)
     {
         if (!externalDialogueSession || dialogueText == null)
@@ -91,6 +140,82 @@ public class DialogueManager : MonoBehaviour
         }
 
         dialogueText.text = text ?? string.Empty;
+    }
+
+    public bool BeginGeneratedChoiceSession(string prompt, string[] optionTexts, Action<int> choiceCallback)
+    {
+        if (dialogueIsPlaying)
+        {
+            return false;
+        }
+
+        if (optionTexts == null)
+        {
+            optionTexts = new string[0];
+        }
+
+        dialogueIsPlaying = true;
+        externalGeneratedChoiceSession = true;
+        externalGeneratedChoiceCallback = choiceCallback;
+
+        if (dialoguePanel != null) dialoguePanel.SetActive(true);
+        if (dialogueText != null) dialogueText.text = prompt ?? string.Empty;
+        if (continueButton != null) continueButton.SetActive(false);
+
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
+
+        if (generatedChoiceButtons != null && generatedChoiceButtons.Length > 0)
+        {
+            for (int i = 0; i < generatedChoiceButtons.Length; i++)
+            {
+                if (generatedChoiceButtons[i] == null) continue;
+                if (i < optionTexts.Length)
+                {
+                    generatedChoiceButtons[i].SetActive(true);
+                    TextMeshProUGUI txt = generatedChoiceButtons[i].GetComponentInChildren<TextMeshProUGUI>();
+                    if (txt != null) 
+                    {
+                        txt.text = optionTexts[i];
+                        ResizeButtonToFitText(generatedChoiceButtons[i], txt);
+                    }
+                }
+                else
+                {
+                    generatedChoiceButtons[i].SetActive(false);
+                }
+            }
+        }
+        else if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] == null) continue;
+                if (i < optionTexts.Length)
+                {
+                    choices[i].SetActive(true);
+                    TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
+                    if (txt != null) 
+                    {
+                        txt.text = optionTexts[i];
+                        ResizeButtonToFitText(choices[i], txt);
+                    }
+                }
+                else
+                {
+                    choices[i].SetActive(false);
+                }
+            }
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        return true;
     }
 
     public void EndExternalDialogueSession()
@@ -102,6 +227,7 @@ public class DialogueManager : MonoBehaviour
 
         externalDialogueSession = false;
         dialogueIsPlaying = false;
+        externalChoiceCallback = null;
 
         if (dialoguePanel != null) dialoguePanel.SetActive(false);
         if (dialogueText != null) dialogueText.text = string.Empty;
@@ -112,6 +238,33 @@ public class DialogueManager : MonoBehaviour
             for (int i = 0; i < choices.Length; i++)
             {
                 if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    public void EndGeneratedChoiceSession()
+    {
+        if (!externalGeneratedChoiceSession)
+        {
+            return;
+        }
+
+        externalGeneratedChoiceSession = false;
+        dialogueIsPlaying = false;
+        externalGeneratedChoiceCallback = null;
+
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
+        if (dialogueText != null) dialogueText.text = string.Empty;
+        if (continueButton != null) continueButton.SetActive(false);
+
+        if (generatedChoiceButtons != null)
+        {
+            for (int i = 0; i < generatedChoiceButtons.Length; i++)
+            {
+                if (generatedChoiceButtons[i] != null) generatedChoiceButtons[i].SetActive(false);
             }
         }
 
@@ -189,7 +342,7 @@ public class DialogueManager : MonoBehaviour
 
             if (currentStory.currentChoices.Count > 0)
             {
-                int randomIndex = Random.Range(0, currentStory.currentChoices.Count);
+                int randomIndex = UnityEngine.Random.Range(0, currentStory.currentChoices.Count);
                 pointWinningText = currentStory.currentChoices[randomIndex].text;
                 Debug.Log($"Round {dialogueRounds + 1} correct choice: {pointWinningText}");
             }
@@ -223,7 +376,11 @@ public class DialogueManager : MonoBehaviour
             {
                 choices[i].gameObject.SetActive(true);
                 TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
-                if (txt != null) txt.text = currentChoices[i].text;
+                if (txt != null) 
+                {
+                    txt.text = currentChoices[i].text;
+                    ResizeButtonToFitText(choices[i], txt);
+                }
             }
             else
             {
@@ -234,7 +391,29 @@ public class DialogueManager : MonoBehaviour
 
     public void MakeChoice(int choiceIndex)
     {
-        if (externalDialogueSession || currentStory == null)
+        if (externalGeneratedChoiceSession)
+        {
+            if (externalGeneratedChoiceCallback != null)
+            {
+                externalGeneratedChoiceCallback(choiceIndex);
+                externalGeneratedChoiceCallback = null;
+            }
+            EndGeneratedChoiceSession();
+            return;
+        }
+
+        if (externalDialogueSession)
+        {
+            if (externalChoiceCallback != null)
+            {
+                externalChoiceCallback(choiceIndex);
+                externalChoiceCallback = null;
+            }
+            EndExternalDialogueSession();
+            return;
+        }
+
+        if (currentStory == null)
         {
             return;
         }
@@ -308,6 +487,9 @@ public class DialogueManager : MonoBehaviour
     {
         dialogueIsPlaying = false;
         externalDialogueSession = false;
+        externalGeneratedChoiceSession = false;
+        externalChoiceCallback = null;
+        externalGeneratedChoiceCallback = null;
         if (dialoguePanel != null) dialoguePanel.SetActive(false);
 
         npcPoints = 0;
@@ -319,6 +501,24 @@ public class DialogueManager : MonoBehaviour
         Cursor.visible = false;
 
         Debug.Log("Dialogue Mode Exited. Shooting should be re-enabled.");
+    }
+
+    private void ResizeButtonToFitText(GameObject button, TextMeshProUGUI text)
+    {
+        if (button == null || text == null) return;
+
+        RectTransform rt = button.GetComponent<RectTransform>();
+        if (rt == null) return;
+
+        // Add some padding
+        float paddingX = 20f;
+        float paddingY = 10f;
+        float maxWidth = 400f; // Optional max width to prevent too wide buttons
+
+        float preferredWidth = Mathf.Min(text.preferredWidth + paddingX, maxWidth);
+        float preferredHeight = text.preferredHeight + paddingY;
+
+        rt.sizeDelta = new Vector2(preferredWidth, preferredHeight);
     }
 }
 

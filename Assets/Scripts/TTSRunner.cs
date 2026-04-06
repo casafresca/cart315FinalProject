@@ -61,7 +61,7 @@ public class TTSRunner : MonoBehaviour
         new SpeakerDisplayName { role = "mad_god", displayName = "Mad God" }
     };
 
-    readonly ConcurrentQueue<string> resultQueue = new ConcurrentQueue<string>();
+    private readonly ConcurrentDictionary<int, string> responseMap = new ConcurrentDictionary<int, string>();
 
     private Process process;
 
@@ -136,6 +136,20 @@ public class TTSRunner : MonoBehaviour
         else if (isSpeaking) Debug.LogWarning("[TTS] Already speaking!");
         else Speak(textToSay);
     }
+
+    public void GenerateChoiceOptions(string prompt, Action<string[]> callback)
+    {
+        if (!isReady)
+        {
+            Debug.LogWarning("[TTS] Not ready yet!");
+            callback?.Invoke(null);
+        }
+        else
+        {
+            StartCoroutine(GenerateChoiceOptionsRoutine(prompt, callback));
+        }
+    }
+
     void Update()
     {
         DrainQueues();
@@ -265,7 +279,7 @@ public class TTSRunner : MonoBehaviour
 
         int id = nextId++;
         string safeRole = string.IsNullOrWhiteSpace(role) ? "soldier" : Escape(role);
-        string json = $"{{\"id\":{id},\"role\":\"{safeRole}\",\"text\":\"{Escape(text)}\"}}";
+        string json = $"{{\"id\":{id},\"requestType\":\"speak\",\"role\":\"{safeRole}\",\"text\":\"{Escape(text)}\"}}";
 
         Debug.Log($"[TTS] Sending: {text}");
         SendJson(json);
@@ -275,45 +289,36 @@ public class TTSRunner : MonoBehaviour
 
         while (Time.time < timeout)
         {
-            while (resultQueue.TryDequeue(out string line))
+            if (responseMap.TryRemove(id, out string line))
             {
-                Debug.Log("[PY STDOUT] " + line);
-
-                if (TryHandleReady(line)) continue;
-
-                if (!line.Contains("\"type\"")) continue;
-
                 TTSResponse response;
-
-                Debug.Log($"[TTS] Processing response for ID {id}...");
-
                 try { response = JsonUtility.FromJson<TTSResponse>(line); }
-                catch { continue; }
+                catch { response = null; }
 
-                if (response == null || response.id != id)
+                if (response == null)
                 {
-                    Debug.LogWarning("[TTS] Ignoring unrelated message: " + line);
-                    continue;
+                    Debug.LogWarning("[TTS] Invalid response line for ID " + id + ": " + line);
                 }
-
-                if (response.type == "error")
+                else if (response.type == "error")
                 {
                     Debug.LogError("[TTS ERROR] " + response.error);
                     ClearSubtitle();
                     isSpeaking = false;
                     yield break;
                 }
+                else
+                {
+                    Debug.Log("[TTS] Reply text: " + response.replyText);
+                    lastCompletedRequestId = response.id;
+                    lastCompletedReplyText = response.replyText ?? string.Empty;
+                    lastCompletedRole = role;
+                    string fullPath = response.wavPath;
 
-                Debug.Log("[TTS] Reply text: " + response.replyText);
-                lastCompletedRequestId = response.id;
-                lastCompletedReplyText = response.replyText ?? string.Empty;
-                lastCompletedRole = role;
-                string fullPath = response.wavPath;
+                    yield return PlayWav(fullPath, role, lastCompletedReplyText);
 
-                yield return PlayWav(fullPath, role, lastCompletedReplyText);
-
-                isSpeaking = false;
-                yield break;
+                    isSpeaking = false;
+                    yield break;
+                }
             }
 
             DrainQueues();
@@ -323,6 +328,51 @@ public class TTSRunner : MonoBehaviour
         Debug.LogError("TTS timeout.");
         ClearSubtitle();
         isSpeaking = false;
+    }
+
+    public IEnumerator GenerateChoiceOptionsRoutine(string prompt, Action<string[]> callback)
+    {
+        int id = nextId++;
+        string json = $"{{\"id\":{id},\"requestType\":\"choices\",\"role\":\"player\",\"text\":\"{Escape(prompt)}\"}}";
+
+        Debug.Log($"[TTS] Sending choice generation request: {prompt}");
+        SendJson(json);
+
+        float timeout = Time.time + requestTimeoutSeconds;
+        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for choice response...");
+
+        while (Time.time < timeout)
+        {
+            if (responseMap.TryRemove(id, out string line))
+            {
+                TTSResponse response;
+                try { response = JsonUtility.FromJson<TTSResponse>(line); }
+                catch { response = null; }
+
+                if (response == null)
+                {
+                    Debug.LogWarning("[TTS] Invalid choice response line for ID " + id + ": " + line);
+                }
+                else if (response.type == "error")
+                {
+                    Debug.LogError("[TTS ERROR] " + response.error);
+                    callback?.Invoke(null);
+                    yield break;
+                }
+                else if (response.type == "choices_result")
+                {
+                    Debug.Log("[TTS] Choice options received.");
+                    callback?.Invoke(response.choices);
+                    yield break;
+                }
+            }
+
+            DrainQueues();
+            yield return null;
+        }
+
+        Debug.LogError("TTS choice generation timeout.");
+        callback?.Invoke(null);
     }
 
     // -------------------------
@@ -349,14 +399,14 @@ public class TTSRunner : MonoBehaviour
             // Try READY first
             if (TryHandleReady(line)) continue;
 
-            // If it's a result message, store it for SpeakRoutine
+            // If it's a result message, store it for the waiting coroutine
             if (line.Contains("\"type\""))
             {
                 try
                 {
                     var response = JsonUtility.FromJson<TTSResponse>(line);
-                    if (response != null && (response.type == "result" || response.type == "error"))
-                        resultQueue.Enqueue(line);
+                    if (response != null && (response.type == "result" || response.type == "choices_result" || response.type == "error"))
+                        responseMap[response.id] = line;
                 }
                 catch { }
             }
@@ -391,7 +441,7 @@ public class TTSRunner : MonoBehaviour
         return false;
     }
 
-    IEnumerator PlayWav(string path, string role, string replyText)
+    public IEnumerator PlayWav(string path, string role, string replyText)
     {
         Debug.Log("[TTS] Loading WAV: " + path);
 
@@ -713,6 +763,7 @@ public class TTSRunner : MonoBehaviour
         public string wavPath;
         public string replyText;
         public string error;
+        public string[] choices;
     }
 }
 

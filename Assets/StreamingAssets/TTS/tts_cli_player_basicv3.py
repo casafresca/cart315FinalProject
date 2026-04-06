@@ -1,9 +1,10 @@
-import sys
+﻿import sys
 import os
 import json
 import time
 import traceback
 import subprocess
+import re
 from collections import defaultdict, deque
 
 import numpy as np
@@ -299,6 +300,68 @@ def generate_reply(*, role: str, user_text: str) -> str:
 
     return cleaned
 
+
+def generate_choice_options(*, role: str, user_text: str) -> list[str]:
+    instruction = (
+        "Generate exactly 4 short player response options, one per line. "
+        "Do not include numbering, extra text, or formatting. "
+        "The options should appear in this exact order: "
+        "showing military respect, "
+        "insulting his service, "
+        "offering to listen, "
+        "ordering him to stand down. "
+        "Keep each option as a concise sentence or phrase."
+    )
+    context = f"Situation: {user_text}" if user_text else ""
+    prompt = (
+        f"{ROLE_SYSTEM_PROMPTS.get(role, ROLE_SYSTEM_PROMPTS[DEFAULT_ROLE])}\n\n"
+        f"{ROLE_STYLE_GUIDES.get(role, '')}\n\n"
+        f"{context}\n\n"
+        f"{instruction}"
+    )
+
+    raw = run_ollama(prompt)
+    log(f"Raw choice generation output: {raw}")
+
+    # Parse as plain text lines
+    lines = [line.strip() for line in raw.replace('\r', '\n').split('\n') if line.strip() and not line.lower().startswith(('here', 'the options', '1.', '2.', '3.', '4.')) and len(line) > 5]
+    if len(lines) >= 4:
+        return [clean_choice(line) for line in lines[:4]]
+
+    # Fallback: try to extract from JSON if present
+    try:
+        choices = json.loads(raw)
+        if isinstance(choices, list) and all(isinstance(item, str) for item in choices):
+            return [clean_choice(choice) for choice in choices[:4]]
+    except Exception:
+        pass
+
+    # Fallback: try to extract JSON array from the text
+    json_match = re.search(r'\[.*\]', raw)
+    if json_match:
+        try:
+            choices = json.loads(json_match.group(0))
+            if isinstance(choices, list) and all(isinstance(item, str) for item in choices):
+                return [clean_choice(choice) for choice in choices[:4]]
+        except Exception:
+            pass
+
+    return [clean_choice(raw)]
+
+
+def clean_choice(choice: str) -> str:
+    # Remove numbering like "1)", "2.", etc.
+    choice = re.sub(r'^\d+\)\s*', '', choice)
+    choice = re.sub(r'^\d+\.\s*', '', choice)
+    # Remove leading/trailing quotes if present
+    choice = choice.strip('"\'' )
+    # Remove any remaining parentheses or brackets if they wrap the whole thing
+    if choice.startswith('(') and choice.endswith(')'):
+        choice = choice[1:-1].strip()
+    if choice.startswith('[') and choice.endswith(']'):
+        choice = choice[1:-1].strip()
+    return choice.strip()
+
 # -------------------------
 # Initialize TTS
 # -------------------------
@@ -395,6 +458,7 @@ def main():
         if not user_text:
             continue
 
+        request_type = msg.get("requestType", "speak")
         incoming_role = msg.get("role") or msg.get("persona") or msg.get("speaker")
         if incoming_role:
             role = normalize_role(str(incoming_role))
@@ -402,8 +466,22 @@ def main():
         else:
             role, user_text = parse_role_and_text(str(user_text))
 
-        log(f"Request {request_id} (role={role}): {user_text}")
+        log(f"Request {request_id} (type={request_type}, role={role}): {user_text}")
         try:
+            if request_type == "choices":
+                choice_texts = generate_choice_options(role=role, user_text=user_text)
+                elapsed_ms = 0
+                response = {
+                    "type": "choices_result",
+                    "id": request_id,
+                    "choices": choice_texts,
+                    "replyText": json.dumps(choice_texts),
+                    "elapsedMs": elapsed_ms,
+                }
+                print(json.dumps(response), flush=True)
+                log(f"Choices sent for request {request_id}")
+                continue
+
             reply_text = generate_reply(role=role, user_text=user_text)
             log(f"Generated reply: {reply_text}")
             start_time = time.perf_counter()

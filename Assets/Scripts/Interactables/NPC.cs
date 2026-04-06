@@ -1,6 +1,9 @@
+using System.Collections;
+using System.IO;
 using UnityEngine;
 using Ink.Runtime;
 using UnityEngine.AI;
+using UnityEngine.Networking;
 
 /// <summary>
 /// Main enemy/ally brain for the soldier NPC.
@@ -36,6 +39,18 @@ public class NPC : Interactable
     [SerializeField, Range(0.05f, 0.95f)] private float dialogueHealthThreshold = 0.3f;
     [Tooltip("If true, damage stops at the dialogue threshold instead of killing the NPC outright.")]
     [SerializeField] private bool preventDeathBeforeDialogue = true;
+
+    [Header("Intro Audio")]
+    [Tooltip("Local WAV file to play before starting combat.")]
+    [SerializeField] private string introWavRelativePath = "TTS/wavs/soldier1.wav";
+    [Tooltip("The text of the soldier's opening line, used to generate context-sensitive reply options.")]
+    [SerializeField] private string introLineText = "Who are you?";
+    [Tooltip("If true, generate custom reply options while the intro WAV plays.")]
+    [SerializeField] private bool useGeneratedReplyOptions = true;
+
+    private bool isIntroSequenceRunning = false;
+    private bool choiceOptionsReady = false;
+    private string[] generatedChoiceOptions;
 
     [Header("2D Sprite Visual (Optional)")]
     [Tooltip("SpriteRenderer used for 2D enemy art in the 3D world.")]
@@ -423,11 +438,145 @@ public class NPC : Interactable
         }
         else if (!isCombatActive)
         {
-            // First interaction at healthy state "wakes up" combat.
+            if (useGeneratedReplyOptions)
+            {
+                StartCoroutine(PlayIntroThenTTS());
+            }
+            else
+            {
+                isCombatActive = true;
+                if (npcGun != null) npcGun.SetActive(true);
+                UpdateVisualState();
+            }
+        }
+    }
+
+    private IEnumerator PlayIntroThenTTS()
+    {
+        if (isIntroSequenceRunning)
+            yield break;
+
+        isIntroSequenceRunning = true;
+        choiceOptionsReady = false;
+        generatedChoiceOptions = null;
+
+        if (useGeneratedReplyOptions && TTSRunner.Instance != null)
+        {
+            TTSRunner.Instance.GenerateChoiceOptions(
+                $"The soldier said: \"{introLineText}\". Generate four short player reply options in this exact order: showing military respect, insulting his service, offering to listen, and ordering him to stand down.",
+                options =>
+                {
+                    generatedChoiceOptions = options;
+                    choiceOptionsReady = true;
+                }
+            );
+        }
+
+        string wavPath = System.IO.Path.Combine(Application.streamingAssetsPath, introWavRelativePath);
+        yield return PlayLocalWav(wavPath);
+
+        float waitUntil = Time.time + 5f;
+        while (!choiceOptionsReady && Time.time < waitUntil)
+            yield return null;
+
+        DialogueManager dialogueManager = DialogueManager.GetInstance();
+        if (dialogueManager != null)
+        {
+            if (choiceOptionsReady && generatedChoiceOptions != null && generatedChoiceOptions.Length > 0)
+            {
+                Debug.Log("NPC: Starting external choice session after intro.");
+                dialogueManager.BeginGeneratedChoiceSession(
+                    "How do you respond to him?",
+                    generatedChoiceOptions,
+                    OnPlayerChoiceSelected
+                );
+            }
+            else if (inkJSON != null)
+            {
+                Debug.Log("NPC: Falling back to Ink dialogue after intro.");
+                dialogueManager.EnterDialogueMode(inkJSON, this);
+            }
+            else
+            {
+                Debug.LogWarning("NPC: No choices available and no inkJSON fallback.");
+                isCombatActive = true;
+                if (npcGun != null) npcGun.SetActive(true);
+                UpdateVisualState();
+            }
+        }
+        else
+        {
+            Debug.LogWarning("NPC: DialogueManager instance was not found.");
             isCombatActive = true;
             if (npcGun != null) npcGun.SetActive(true);
             UpdateVisualState();
         }
+
+        isIntroSequenceRunning = false;
+    }
+
+    private void OnPlayerChoiceSelected(int choiceIndex)
+    {
+        if (generatedChoiceOptions == null || choiceIndex < 0 || choiceIndex >= generatedChoiceOptions.Length)
+        {
+            Debug.LogWarning("NPC: Invalid player choice index.");
+            isCombatActive = true;
+            if (npcGun != null) npcGun.SetActive(true);
+            UpdateVisualState();
+            return;
+        }
+
+        string selectedChoice = generatedChoiceOptions[choiceIndex];
+        StartCoroutine(PlayResponseAfterChoice(selectedChoice));
+    }
+
+    private IEnumerator PlayResponseAfterChoice(string selectedChoice)
+    {
+        string prompt = $"The soldier said: \"{introLineText}\". The player replied: \"{selectedChoice}\". Respond as the soldier with a short, in-character line.";
+
+        if (TTSRunner.Instance != null)
+        {
+            TTSRunner.Instance.SpeakAs("soldier", prompt);
+            yield return new WaitUntil(() => TTSRunner.Instance != null && !TTSRunner.Instance.IsSpeaking);
+        }
+
+        isCombatActive = true;
+        if (npcGun != null) npcGun.SetActive(true);
+        UpdateVisualState();
+    }
+
+    private IEnumerator PlayLocalWav(string path)
+    {
+        if (!File.Exists(path))
+        {
+            Debug.LogError($"NPC: intro WAV not found at {path}");
+            yield break;
+        }
+
+        string url = "file:///" + path.Replace("\\", "/");
+        using var req = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.WAV);
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError($"NPC: failed to load intro WAV: {req.error}");
+            yield break;
+        }
+
+        AudioClip clip = DownloadHandlerAudioClip.GetContent(req);
+        if (clip == null)
+        {
+            Debug.LogError("NPC: intro WAV loaded null clip.");
+            yield break;
+        }
+
+        AudioSource source = GetComponent<AudioSource>();
+        if (source == null)
+            source = gameObject.AddComponent<AudioSource>();
+
+        source.clip = clip;
+        source.Play();
+        yield return new WaitWhile(() => source.isPlaying);
     }
 
     private void UpdateVisualState()
@@ -591,6 +740,12 @@ public class NPC : Interactable
         }
 
         return currentHealth <= (maxHealth * dialogueHealthThreshold) + DialogueThresholdEpsilon;
+    }
+
+    [System.Serializable]
+    private class ChoicePayload
+    {
+        public string[] choices;
     }
 }
 
