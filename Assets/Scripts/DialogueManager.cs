@@ -1,7 +1,6 @@
 using UnityEngine;
 using TMPro;
 using Ink.Runtime;
-using System;
 using System.Collections.Generic;
 
 public class DialogueManager : MonoBehaviour
@@ -27,7 +26,6 @@ public class DialogueManager : MonoBehaviour
 
     private Story currentStory;
     private bool externalDialogueSession;
-    private Action<int> externalChoiceCallback;
 
     // This is the variable your Weapon script checks
     public bool dialogueIsPlaying { get; private set; }
@@ -60,11 +58,6 @@ public class DialogueManager : MonoBehaviour
 
     public bool TryBeginExternalDialogueSession(string openingText)
     {
-        return TryBeginExternalDialogueSession(openingText, Array.Empty<string>(), null);
-    }
-
-    public bool TryBeginExternalDialogueSession(string openingText, IReadOnlyList<string> choiceTexts, Action<int> onChoiceSelected)
-    {
         if (dialogueIsPlaying)
         {
             return false;
@@ -72,13 +65,18 @@ public class DialogueManager : MonoBehaviour
 
         dialogueIsPlaying = true;
         externalDialogueSession = true;
-        externalChoiceCallback = onChoiceSelected;
 
         if (dialoguePanel != null) dialoguePanel.SetActive(true);
         if (dialogueText != null) dialogueText.text = openingText ?? string.Empty;
         if (continueButton != null) continueButton.SetActive(false);
 
-        ApplyExternalChoices(choiceTexts);
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -104,13 +102,18 @@ public class DialogueManager : MonoBehaviour
 
         externalDialogueSession = false;
         dialogueIsPlaying = false;
-        externalChoiceCallback = null;
 
         if (dialoguePanel != null) dialoguePanel.SetActive(false);
         if (dialogueText != null) dialogueText.text = string.Empty;
         if (continueButton != null) continueButton.SetActive(false);
 
-        HideAllChoiceButtons();
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -186,7 +189,7 @@ public class DialogueManager : MonoBehaviour
 
             if (currentStory.currentChoices.Count > 0)
             {
-                int randomIndex = UnityEngine.Random.Range(0, currentStory.currentChoices.Count);
+                int randomIndex = Random.Range(0, currentStory.currentChoices.Count);
                 pointWinningText = currentStory.currentChoices[randomIndex].text;
                 Debug.Log($"Round {dialogueRounds + 1} correct choice: {pointWinningText}");
             }
@@ -231,13 +234,7 @@ public class DialogueManager : MonoBehaviour
 
     public void MakeChoice(int choiceIndex)
     {
-        if (externalDialogueSession)
-        {
-            HandleExternalChoice(choiceIndex);
-            return;
-        }
-
-        if (currentStory == null)
+        if (externalDialogueSession || currentStory == null)
         {
             return;
         }
@@ -311,7 +308,6 @@ public class DialogueManager : MonoBehaviour
     {
         dialogueIsPlaying = false;
         externalDialogueSession = false;
-        externalChoiceCallback = null;
         if (dialoguePanel != null) dialoguePanel.SetActive(false);
 
         npcPoints = 0;
@@ -323,67 +319,6 @@ public class DialogueManager : MonoBehaviour
         Cursor.visible = false;
 
         Debug.Log("Dialogue Mode Exited. Shooting should be re-enabled.");
-    }
-
-    private void ApplyExternalChoices(IReadOnlyList<string> choiceTexts)
-    {
-        if (choices == null)
-        {
-            return;
-        }
-
-        int count = choiceTexts == null ? 0 : choiceTexts.Count;
-        for (int i = 0; i < choices.Length; i++)
-        {
-            if (choices[i] == null) continue;
-
-            if (i < count && !string.IsNullOrWhiteSpace(choiceTexts[i]))
-            {
-                choices[i].SetActive(true);
-                TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
-                if (txt != null) txt.text = choiceTexts[i];
-            }
-            else
-            {
-                choices[i].SetActive(false);
-            }
-        }
-    }
-
-    private void HideAllChoiceButtons()
-    {
-        if (choices == null) return;
-        for (int i = 0; i < choices.Length; i++)
-        {
-            if (choices[i] != null) choices[i].SetActive(false);
-        }
-    }
-
-    private void HandleExternalChoice(int choiceIndex)
-    {
-        int available = 0;
-        if (choices != null)
-        {
-            for (int i = 0; i < choices.Length; i++)
-            {
-                if (choices[i] != null && choices[i].activeSelf)
-                {
-                    available++;
-                }
-            }
-        }
-
-        if (available <= 0)
-        {
-            return;
-        }
-
-        int safeIndex = Mathf.Clamp(choiceIndex, 0, available - 1);
-        HideAllChoiceButtons();
-
-        Action<int> callback = externalChoiceCallback;
-        externalChoiceCallback = null;
-        callback?.Invoke(safeIndex);
     }
 }
 

@@ -299,133 +299,13 @@ def generate_reply(*, role: str, user_text: str) -> str:
 
     return cleaned
 
-
-def _clean_single_line(text: str, *, max_chars: int) -> str:
-    candidate = " ".join((text or "").strip().split())
-    if ":" in candidate[:24]:
-        candidate = candidate.split(":", 1)[1].strip()
-    candidate = candidate[:max_chars].strip()
-    return candidate
-
-
-def _parse_choices_from_text(raw: str) -> list[str]:
-    if not raw:
-        return []
-
-    raw = raw.strip()
-    # Prefer strict JSON array.
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, list):
-            return [str(x) for x in parsed]
-    except Exception:
-        pass
-
-    # Fallback: treat as newline-separated list (strip numbering/bullets).
-    choices: list[str] = []
-    for line in raw.splitlines():
-        t = line.strip()
-        if not t:
-            continue
-        # Remove leading bullets / numbering like "1) " or "- " or "• ".
-        while t and (t[0] in "-•*"):
-            t = t[1:].lstrip()
-        if len(t) >= 2 and t[0].isdigit():
-            # "1." / "1)" / "1:"
-            if t[1:2] in [".", ")", ":"]:
-                t = t[2:].lstrip()
-        if t:
-            choices.append(t)
-    return choices
-
-
-def generate_choices(*, role: str, user_text: str, n: int) -> list[str]:
-    global rag_engine
-
-    if rag_engine is not None and getattr(rag_engine, "enabled", False) and getattr(rag_engine, "vectorizer", None) is None:
-        log("[RAG] Lazy init on first request...")
-        rag_engine.initialize()
-
-    memory_context = ""
-    if rag_engine is not None:
-        memory_context = rag_engine.build_prompt_context(user_text)
-
-    role_prompt = ROLE_SYSTEM_PROMPTS.get(role, ROLE_SYSTEM_PROMPTS[DEFAULT_ROLE])
-    role_style = ROLE_STYLE_GUIDES.get(role, "")
-
-    speaker_name = {
-        "soldier": "Soldier",
-        "player": "Player",
-        "mad_god": "MadGod",
-    }.get(role, "Speaker")
-
-    max_chars = FAST_REPLY_MAX_CHARS if FAST_REPLY_ENABLED else NORMAL_REPLY_MAX_CHARS
-    max_chars = max(60, max_chars)
-
-    safe_n = max(1, min(int(n), 8))
-    base_prompt = (
-        f"{role_prompt}\n\n"
-        f"Role style guide:\n{role_style}\n\n"
-        f"{memory_context}\n\n"
-        f"Scene context:\n{user_text}\n\n"
-        f"Task: Write {safe_n} DISTINCT, plausible reply options the player could say next.\n"
-        "Output ONLY a valid JSON array of strings. No extra text, no numbering, no quotes around the whole thing.\n"
-        f"Rules: each string under {max_chars} characters, natural spoken dialogue, no stage directions, no parentheses."
-    )
-
-    last_raw = ""
-    for attempt in range(3):
-        prompt = base_prompt
-        if attempt > 0 and last_raw:
-            prompt += "\nStrictly output JSON. Avoid repeating the same options as before."
-
-        try:
-            raw = run_ollama(prompt)
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f"Ollama timed out after {OLLAMA_TIMEOUT_SECONDS:g}s. Is the Ollama app/server running?"
-            ) from exc
-        except FileNotFoundError as exc:
-            raise RuntimeError(
-                f"Ollama executable was not found at '{OLLAMA_EXE}' and was not available on PATH."
-            ) from exc
-        except subprocess.CalledProcessError as exc:
-            details = (exc.stderr or exc.stdout or str(exc)).strip()
-            raise RuntimeError(f"Ollama failed: {details}") from exc
-
-        last_raw = raw
-        parsed = _parse_choices_from_text(raw)
-        cleaned: list[str] = []
-        seen: set[str] = set()
-        for item in parsed:
-            c = _clean_single_line(item, max_chars=max_chars)
-            key = c.lower()
-            if not c or key in seen:
-                continue
-            cleaned.append(c)
-            seen.add(key)
-            if len(cleaned) >= safe_n:
-                break
-
-        if len(cleaned) >= safe_n:
-            return cleaned[:safe_n]
-
-    # Hard fallback (keeps gameplay unblocked).
-    fallback = [
-        "Easy—don't do that.",
-        "If you shoot me, this ends badly for both of us.",
-        "Look at me. You're not back there.",
-        "Tell me what you think you saw."
-    ]
-    return fallback[:safe_n]
-
 # -------------------------
 # Initialize TTS
 # -------------------------
 def initialize():
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    #log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
-    #log(f"Loading model: {MODEL_NAME}")
+    log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
+    log(f"Loading model: {MODEL_NAME}")
     start = time.perf_counter()
     tts = TTS(MODEL_NAME).to(device)
     load_time = time.perf_counter() - start
@@ -459,7 +339,7 @@ def main():
 
     os.makedirs(out_dir, exist_ok=True)
     out_dir = os.path.abspath(out_dir)
-    #log(f"Output directory: {out_dir}")
+    log(f"Output directory: {out_dir}")
 
     load_mad_god_lore(script_dir)
 
@@ -523,42 +403,8 @@ def main():
             role, user_text = parse_role_and_text(str(user_text))
 
         log(f"Request {request_id} (role={role}): {user_text}")
-
-        if msg.get("cmd") == "choices":
-            try:
-                n = int(msg.get("n", 4))
-            except Exception:
-                n = 4
-
-            try:
-                choices = generate_choices(role=role, user_text=user_text, n=n)
-                response = {
-                    "type": "choices",
-                    "id": request_id,
-                    "choices": choices,
-                }
-                print(json.dumps(response), flush=True)
-                #log(f"Choices sent for request {request_id} ({len(choices)} items)")
-            except Exception as e:
-                log(f"Error: {e}")
-                traceback.print_exc()
-                error_response = {"type": "error", "id": request_id, "error": str(e)}
-                print(json.dumps(error_response), flush=True)
-
-            continue
-
         try:
-            mode = str(msg.get("mode", "ai")).strip().lower()
-
-            if mode == "direct":
-                max_chars = FAST_REPLY_MAX_CHARS if FAST_REPLY_ENABLED else NORMAL_REPLY_MAX_CHARS
-                max_chars = max(60, max_chars)
-                reply_text = _clean_single_line(user_text, max_chars=max_chars)
-                if not reply_text:
-                    raise RuntimeError("Direct mode requires non-empty text.")
-            else:
-                reply_text = generate_reply(role=role, user_text=user_text)
-
+            reply_text = generate_reply(role=role, user_text=user_text)
             log(f"Generated reply: {reply_text}")
             start_time = time.perf_counter()
 
@@ -573,7 +419,7 @@ def main():
 
             out_path = os.path.abspath(os.path.join(out_dir, f"tts_{request_id}_{int(time.time() * 1000)}.wav"))
             sf.write(out_path, wav_np, sample_rate)
-            #log(f"Wrote WAV file: {out_path} ({os.path.getsize(out_path)} bytes)")
+            log(f"Wrote WAV file: {out_path} ({os.path.getsize(out_path)} bytes)")
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
             response = {
@@ -586,7 +432,7 @@ def main():
                 "elapsedMs": elapsed_ms,
             }
             print(json.dumps(response), flush=True)
-            #log(f"Result sent for request {request_id}")
+            log(f"Result sent for request {request_id}")
 
         except Exception as e:
             log(f"Error: {e}")
