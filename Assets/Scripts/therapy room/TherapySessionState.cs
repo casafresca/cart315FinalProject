@@ -6,7 +6,6 @@ public static class TherapySessionState
     public static bool AnswerWasCorrect { get; private set; }
     public static string SelectedAnswer { get; private set; }
     public static string OutcomeMessage { get; private set; }
-    public static int CapturedSoldierCount { get; private set; }
 
     public static bool HasReturnPoint { get; private set; }
     public static string ReturnSceneName { get; private set; }
@@ -55,11 +54,5 @@ public static class TherapySessionState
         AnswerWasCorrect = false;
         SelectedAnswer = string.Empty;
         OutcomeMessage = string.Empty;
-    }
-
-    public static int RegisterCapturedSoldier()
-    {
-        CapturedSoldierCount++;
-        return CapturedSoldierCount;
     }
 }
