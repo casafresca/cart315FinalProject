@@ -11,6 +11,7 @@ public class PhotoCapture : MonoBehaviour
     [SerializeField] private GameObject photoFrame;
     [SerializeField] private GameObject cameraUI;
     [SerializeField] private Texture2D photoOverlayTexture;
+    [SerializeField] private bool applyPhotoOverlayTexture = false;
     [SerializeField] private GameObject returnCountdownPanel;
     [SerializeField] private TextMeshProUGUI returnCountdownText;
     [SerializeField] private float returnDelaySeconds = 5f;
@@ -23,20 +24,54 @@ public class PhotoCapture : MonoBehaviour
     [Header("Photo Fader Effect")]
     [SerializeField] private Animator fadingAnimation;
 
+    [Header("Ending Sequence")]
+    [SerializeField] private Sprite[] endingPhotoSprites;
+    [SerializeField] private Sprite galleryBackdropSprite;
+    [SerializeField] private Color galleryBackdropColor = Color.white;
+    [SerializeField] private Sprite emptyBoardSprite;
+    [SerializeField] private Sprite[] completedBoardSprites;
+    [SerializeField] private float capturedPhotoHoldSeconds = 1.1f;
+    [SerializeField] private float emptyBoardHoldSeconds = 1f;
+    [SerializeField] private float photoPlaceDuration = 1f;
+    [SerializeField] private float completedBoardHoldSeconds = 1.6f;
+    [SerializeField] private Vector2[] boardPhotoTargetPositions;
+    [SerializeField] private Vector2[] boardPhotoTargetSizes;
+    [SerializeField] private Vector2 boardPhotoStartSize = new Vector2(500f, 620f);
+
     [Header("Audio")]
     [SerializeField] private AudioSource cameraAudio;
 
     private Texture2D screenCapture;
     private Texture2D compositedPhoto;
     private Sprite capturedPhotoSprite;
+    private Image photoFrameImage;
+    private RectTransform photoFrameRect;
+    private GameObject photoHolderMask;
+    private RectTransform photoHolderMaskRect;
+    private GameObject photoDisplayAreaBackground;
+    private bool cachedPhotoFrameLayout;
+    private Vector2 originalAnchorMin;
+    private Vector2 originalAnchorMax;
+    private Vector2 originalPivot;
+    private Vector2 originalAnchoredPosition;
+    private Vector2 originalSizeDelta;
+    private bool cachedPhotoHolderLayout;
+    private Vector2 originalHolderAnchorMin;
+    private Vector2 originalHolderAnchorMax;
+    private Vector2 originalHolderPivot;
+    private Vector2 originalHolderAnchoredPosition;
+    private Vector2 originalHolderSizeDelta;
+    private bool originalPhotoBackgroundActive = true;
     private bool isCaptureModeActive;
     private bool viewingPhoto;
     private bool cameraUnlocked;
     private Coroutine returnCountdownRoutine;
+    private Coroutine endingSequenceRoutine;
 
     private void Start()
     {
         screenCapture = new Texture2D(Screen.width, Screen.height, TextureFormat.RGBA32, false);
+        CachePhotoUiReferences();
         SetPhotoVisible(false);
         SetCameraUiVisible(false);
         SetReturnCountdownVisible(false);
@@ -56,7 +91,7 @@ public class PhotoCapture : MonoBehaviour
             StartCoroutine(CapturePhoto());
         }
 
-        if (Input.GetMouseButtonDown(1) && viewingPhoto)
+        if (Input.GetMouseButtonDown(1) && viewingPhoto && endingSequenceRoutine == null)
         {
             Debug.Log("[PhotoCapture] Right mouse clicked. Closing photo preview.");
             RemovePhoto();
@@ -136,26 +171,28 @@ public class PhotoCapture : MonoBehaviour
             Destroy(capturedPhotoSprite);
         }
 
-        Texture2D finalPhoto = BuildFinalPhotoTexture();
-
-        capturedPhotoSprite = Sprite.Create(
-            finalPhoto,
-            new Rect(0, 0, finalPhoto.width, finalPhoto.height),
-            new Vector2(0.5f, 0.5f),
-            100.0f
-        );
-
-        if (photoDisplayArea != null)
+        Sprite endingPhotoSprite = GetEndingPhotoSprite();
+        if (endingPhotoSprite != null)
         {
-            photoDisplayArea.sprite = capturedPhotoSprite;
-            photoDisplayArea.preserveAspect = true;
+            capturedPhotoSprite = endingPhotoSprite;
         }
+        else
+        {
+            Texture2D finalPhoto = BuildFinalPhotoTexture();
+
+            capturedPhotoSprite = Sprite.Create(
+                finalPhoto,
+                new Rect(0, 0, finalPhoto.width, finalPhoto.height),
+                new Vector2(0.5f, 0.5f),
+                100.0f
+            );
+        }
+
+        ShowCapturedPhotoSprite();
 
         viewingPhoto = true;
         SetPhotoVisible(true);
         Debug.Log("[PhotoCapture] Captured photo is now displayed and photo frame is visible.");
-
-        StartReturnCountdown();
 
         if (fadingAnimation != null)
         {
@@ -163,6 +200,13 @@ public class PhotoCapture : MonoBehaviour
         }
 
         StartCoroutine(CameraFlashEffect());
+
+        if (endingSequenceRoutine != null)
+        {
+            StopCoroutine(endingSequenceRoutine);
+        }
+
+        endingSequenceRoutine = StartCoroutine(PlayEndingSequence());
     }
 
     private Texture2D BuildFinalPhotoTexture()
@@ -176,6 +220,12 @@ public class PhotoCapture : MonoBehaviour
         compositedPhoto.SetPixels(screenCapture.GetPixels());
 
         if (photoOverlayTexture == null)
+        {
+            compositedPhoto.Apply();
+            return compositedPhoto;
+        }
+
+        if (!applyPhotoOverlayTexture)
         {
             compositedPhoto.Apply();
             return compositedPhoto;
@@ -238,8 +288,84 @@ public class PhotoCapture : MonoBehaviour
         }
     }
 
+    private IEnumerator PlayEndingSequence()
+    {
+        yield return new WaitForSeconds(Mathf.Max(0f, capturedPhotoHoldSeconds));
+        QueueMainSceneGalleryReveal();
+        StartReturnCountdown();
+        endingSequenceRoutine = null;
+    }
+
+    private Sprite GetCompletedBoardSprite()
+    {
+        if (completedBoardSprites == null || completedBoardSprites.Length == 0)
+        {
+            return null;
+        }
+
+        int capturedCount = TherapySessionState.RegisterCapturedSoldier();
+        int index = Mathf.Clamp(capturedCount - 1, 0, completedBoardSprites.Length - 1);
+        return completedBoardSprites[index];
+    }
+
+    private Sprite GetEndingPhotoSprite()
+    {
+        if (endingPhotoSprites == null || endingPhotoSprites.Length == 0)
+        {
+            return null;
+        }
+
+        int predictedCount = Mathf.Max(1, TherapySessionState.CapturedSoldierCount + 1);
+        int index = Mathf.Clamp(predictedCount - 1, 0, endingPhotoSprites.Length - 1);
+        return endingPhotoSprites[index];
+    }
+
+    private void QueueMainSceneGalleryReveal()
+    {
+        Sprite completedBoardSprite = GetCompletedBoardSprite();
+        string returnSceneName = TherapySessionState.HasReturnPoint
+            ? TherapySessionState.ReturnSceneName
+            : fallbackReturnSceneName;
+        Sprite backdropSprite = galleryBackdropSprite != null
+            ? galleryBackdropSprite
+            : BuildBackdropSpriteFromOverlayTexture();
+
+        TherapySessionState.QueueGalleryReveal(
+            returnSceneName,
+            backdropSprite,
+            galleryBackdropColor,
+            emptyBoardSprite,
+            completedBoardSprite,
+            emptyBoardHoldSeconds,
+            photoPlaceDuration,
+            completedBoardHoldSeconds);
+    }
+
+    private Sprite BuildBackdropSpriteFromOverlayTexture()
+    {
+        if (photoOverlayTexture == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Sprite.Create(
+                photoOverlayTexture,
+                new Rect(0f, 0f, photoOverlayTexture.width, photoOverlayTexture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+        }
+        catch (UnityException)
+        {
+            Debug.LogWarning("[PhotoCapture] Could not build gallery backdrop sprite from photoOverlayTexture.");
+            return null;
+        }
+    }
+
     private void RemovePhoto()
     {
+        RestoreCapturedPhotoLayout();
         viewingPhoto = false;
         SetPhotoVisible(false);
         SetCameraUiVisible(isCaptureModeActive);
@@ -314,11 +440,253 @@ public class PhotoCapture : MonoBehaviour
         }
     }
 
+    private void CachePhotoUiReferences()
+    {
+        if (photoFrame != null)
+        {
+            photoFrameImage = photoFrame.GetComponent<Image>();
+            photoFrameRect = photoFrame.GetComponent<RectTransform>();
+
+            Transform holder = photoFrame.transform.Find("Photo_HolderMask");
+            if (holder == null && photoFrame.transform.childCount > 0)
+            {
+                holder = photoFrame.transform.GetChild(0);
+            }
+
+            if (holder != null)
+            {
+                photoHolderMask = holder.gameObject;
+                photoHolderMaskRect = holder.GetComponent<RectTransform>();
+
+                if (holder.childCount > 0)
+                {
+                    photoDisplayAreaBackground = holder.GetChild(0).gameObject;
+                    originalPhotoBackgroundActive = photoDisplayAreaBackground.activeSelf;
+                }
+            }
+
+            CacheOriginalPhotoFrameLayout();
+            CacheOriginalPhotoHolderLayout();
+        }
+    }
+
+    private void ShowCapturedPhotoSprite()
+    {
+        RestoreCapturedPhotoLayout();
+
+        if (photoDisplayArea != null)
+        {
+            photoDisplayArea.sprite = capturedPhotoSprite;
+            photoDisplayArea.preserveAspect = true;
+            photoDisplayArea.color = Color.white;
+        }
+    }
+
+    private void ShowBoardSprite(Sprite sprite)
+    {
+        if (sprite == null)
+        {
+            return;
+        }
+
+        CachePhotoUiReferences();
+
+        if (photoHolderMask != null)
+        {
+            photoHolderMask.SetActive(false);
+        }
+
+        ExpandPhotoFrameFullscreen();
+
+        if (photoFrameImage != null)
+        {
+            photoFrameImage.sprite = sprite;
+            photoFrameImage.preserveAspect = true;
+            photoFrameImage.color = Color.white;
+        }
+        else if (photoDisplayArea != null)
+        {
+            photoDisplayArea.sprite = sprite;
+            photoDisplayArea.preserveAspect = true;
+            photoDisplayArea.color = Color.white;
+        }
+    }
+
+    private IEnumerator AnimatePhotoPlacement()
+    {
+        CachePhotoUiReferences();
+
+        if (photoHolderMask == null || photoHolderMaskRect == null || photoDisplayArea == null)
+        {
+            yield break;
+        }
+
+        if (photoDisplayAreaBackground != null)
+        {
+            photoDisplayAreaBackground.SetActive(false);
+        }
+
+        photoHolderMask.SetActive(true);
+        photoDisplayArea.sprite = capturedPhotoSprite;
+        photoDisplayArea.preserveAspect = true;
+        photoDisplayArea.color = Color.white;
+
+        photoHolderMaskRect.anchorMin = new Vector2(0.5f, 0.5f);
+        photoHolderMaskRect.anchorMax = new Vector2(0.5f, 0.5f);
+        photoHolderMaskRect.pivot = new Vector2(0.5f, 0.5f);
+        photoHolderMaskRect.anchoredPosition = Vector2.zero;
+        photoHolderMaskRect.sizeDelta = boardPhotoStartSize;
+
+        Vector2 targetPosition = GetBoardPhotoTargetPosition();
+        Vector2 targetSize = GetBoardPhotoTargetSize();
+        float duration = Mathf.Max(0.01f, photoPlaceDuration);
+        float timer = 0f;
+
+        while (timer < duration)
+        {
+            timer += Time.deltaTime;
+            float t = Mathf.Clamp01(timer / duration);
+            float eased = Mathf.SmoothStep(0f, 1f, t);
+            photoHolderMaskRect.anchoredPosition = Vector2.Lerp(Vector2.zero, targetPosition, eased);
+            photoHolderMaskRect.sizeDelta = Vector2.Lerp(boardPhotoStartSize, targetSize, eased);
+            yield return null;
+        }
+
+        photoHolderMaskRect.anchoredPosition = targetPosition;
+        photoHolderMaskRect.sizeDelta = targetSize;
+    }
+
+    private void RestoreCapturedPhotoLayout()
+    {
+        CachePhotoUiReferences();
+
+        if (photoHolderMask != null)
+        {
+            photoHolderMask.SetActive(true);
+        }
+
+        if (photoFrameImage != null)
+        {
+            photoFrameImage.sprite = null;
+            photoFrameImage.preserveAspect = false;
+            photoFrameImage.color = Color.white;
+        }
+
+        RestoreOriginalPhotoFrameLayout();
+        RestoreOriginalPhotoHolderLayout();
+
+        if (photoDisplayAreaBackground != null)
+        {
+            photoDisplayAreaBackground.SetActive(originalPhotoBackgroundActive);
+        }
+    }
+
+    private void CacheOriginalPhotoFrameLayout()
+    {
+        if (cachedPhotoFrameLayout || photoFrameRect == null)
+        {
+            return;
+        }
+
+        originalAnchorMin = photoFrameRect.anchorMin;
+        originalAnchorMax = photoFrameRect.anchorMax;
+        originalPivot = photoFrameRect.pivot;
+        originalAnchoredPosition = photoFrameRect.anchoredPosition;
+        originalSizeDelta = photoFrameRect.sizeDelta;
+        cachedPhotoFrameLayout = true;
+    }
+
+    private void ExpandPhotoFrameFullscreen()
+    {
+        if (photoFrameRect == null)
+        {
+            return;
+        }
+
+        photoFrameRect.anchorMin = Vector2.zero;
+        photoFrameRect.anchorMax = Vector2.one;
+        photoFrameRect.pivot = new Vector2(0.5f, 0.5f);
+        photoFrameRect.anchoredPosition = Vector2.zero;
+        photoFrameRect.sizeDelta = Vector2.zero;
+    }
+
+    private void RestoreOriginalPhotoFrameLayout()
+    {
+        if (!cachedPhotoFrameLayout || photoFrameRect == null)
+        {
+            return;
+        }
+
+        photoFrameRect.anchorMin = originalAnchorMin;
+        photoFrameRect.anchorMax = originalAnchorMax;
+        photoFrameRect.pivot = originalPivot;
+        photoFrameRect.anchoredPosition = originalAnchoredPosition;
+        photoFrameRect.sizeDelta = originalSizeDelta;
+    }
+
+    private void CacheOriginalPhotoHolderLayout()
+    {
+        if (cachedPhotoHolderLayout || photoHolderMaskRect == null)
+        {
+            return;
+        }
+
+        originalHolderAnchorMin = photoHolderMaskRect.anchorMin;
+        originalHolderAnchorMax = photoHolderMaskRect.anchorMax;
+        originalHolderPivot = photoHolderMaskRect.pivot;
+        originalHolderAnchoredPosition = photoHolderMaskRect.anchoredPosition;
+        originalHolderSizeDelta = photoHolderMaskRect.sizeDelta;
+        cachedPhotoHolderLayout = true;
+    }
+
+    private void RestoreOriginalPhotoHolderLayout()
+    {
+        if (!cachedPhotoHolderLayout || photoHolderMaskRect == null)
+        {
+            return;
+        }
+
+        photoHolderMaskRect.anchorMin = originalHolderAnchorMin;
+        photoHolderMaskRect.anchorMax = originalHolderAnchorMax;
+        photoHolderMaskRect.pivot = originalHolderPivot;
+        photoHolderMaskRect.anchoredPosition = originalHolderAnchoredPosition;
+        photoHolderMaskRect.sizeDelta = originalHolderSizeDelta;
+    }
+
+    private Vector2 GetBoardPhotoTargetPosition()
+    {
+        if (boardPhotoTargetPositions == null || boardPhotoTargetPositions.Length == 0)
+        {
+            return new Vector2(-292f, 58f);
+        }
+
+        int predictedCount = Mathf.Max(1, TherapySessionState.CapturedSoldierCount + 1);
+        int index = Mathf.Clamp(predictedCount - 1, 0, boardPhotoTargetPositions.Length - 1);
+        return boardPhotoTargetPositions[index];
+    }
+
+    private Vector2 GetBoardPhotoTargetSize()
+    {
+        if (boardPhotoTargetSizes == null || boardPhotoTargetSizes.Length == 0)
+        {
+            return new Vector2(180f, 215f);
+        }
+
+        int predictedCount = Mathf.Max(1, TherapySessionState.CapturedSoldierCount + 1);
+        int index = Mathf.Clamp(predictedCount - 1, 0, boardPhotoTargetSizes.Length - 1);
+        return boardPhotoTargetSizes[index];
+    }
+
     private void OnDestroy()
     {
         if (returnCountdownRoutine != null)
         {
             StopCoroutine(returnCountdownRoutine);
+        }
+
+        if (endingSequenceRoutine != null)
+        {
+            StopCoroutine(endingSequenceRoutine);
         }
 
         if (capturedPhotoSprite != null)

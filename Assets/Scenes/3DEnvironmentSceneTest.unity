@@ -44779,6 +44779,8 @@ MonoBehaviour:
   skipSubtitleSecondsIfNoClip: 1.25
   subtitleText: {fileID: 0}
   subtitleLines: []
+  subtitleTranscriptAsset: {fileID: 4900000, guid: 209122fbf82ff7e47b18bcbdfaffb942, type: 3}
+  subtitleTranscriptStreamingAssetsRelativePath: TTS/wavs/madGodTranscript.txt
   playerScriptsToDisable: []
   autoFindInputAndWeapon: 1
   playOnce: 1
