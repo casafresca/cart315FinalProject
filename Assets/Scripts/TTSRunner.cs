@@ -54,7 +54,8 @@ public class TTSRunner : MonoBehaviour
     [SerializeField] private float subtitleSpeakerFontSize = 20f;
     [SerializeField] private float subtitleBodyFontSize = 26f;
     [SerializeField] private int maxSubtitleCharacters = 140;
-    [SerializeField] private SpeakerDisplayName[] speakerDisplayNames =
+    [SerializeField]
+    private SpeakerDisplayName[] speakerDisplayNames =
     {
         new SpeakerDisplayName { role = "soldier", displayName = "Soldier" },
         new SpeakerDisplayName { role = "player", displayName = "You" },
@@ -163,6 +164,32 @@ public class TTSRunner : MonoBehaviour
         }
     }
 
+    public void GenerateDebateTurn(DebateTurnRequestData request, Action<DebateTurnResultData> callback)
+    {
+        if (!isReady)
+        {
+            Debug.LogWarning("[TTS] Not ready yet!");
+            callback?.Invoke(null);
+        }
+        else
+        {
+            StartCoroutine(GenerateDebateTurnRoutine(request, callback));
+        }
+    }
+
+    public void GenerateTypedConversationTurn(TypedConversationRequestData request, Action<TypedConversationResultData> callback)
+    {
+        if (!isReady)
+        {
+            Debug.LogWarning("[TTS] Not ready yet!");
+            callback?.Invoke(null);
+        }
+        else
+        {
+            StartCoroutine(GenerateTypedConversationTurnRoutine(request, callback));
+        }
+    }
+
     void Update()
     {
         DrainQueues();
@@ -248,7 +275,7 @@ public class TTSRunner : MonoBehaviour
         psi.EnvironmentVariables["NORMAL_REPLY_MAX_CHARS"] = normalChars;
         psi.EnvironmentVariables["MAX_SPEAKER_REFERENCES"] = refs.ToString();
 
-        Debug.Log($"[TTS] AI Speed Mode: {(fastReplyMode ? "FAST" : "NORMAL")}, chars={ (fastReplyMode ? fastChars : normalChars) }, refs={refs}");
+        Debug.Log($"[TTS] AI Speed Mode: {(fastReplyMode ? "FAST" : "NORMAL")}, chars={(fastReplyMode ? fastChars : normalChars)}, refs={refs}");
     }
 
     [ContextMenu("Restart Python TTS")]
@@ -433,6 +460,170 @@ public class TTSRunner : MonoBehaviour
         callback?.Invoke(null);
     }
 
+    public IEnumerator GenerateDebateTurnRoutine(DebateTurnRequestData request, Action<DebateTurnResultData> callback)
+    {
+        if (request == null)
+        {
+            callback?.Invoke(null);
+            yield break;
+        }
+
+        int id = nextId++;
+        DebateTurnMessage message = new DebateTurnMessage
+        {
+            id = id,
+            requestType = "debate_turn",
+            role = string.IsNullOrWhiteSpace(request.role) ? "soldier" : request.role,
+            soldierName = request.soldierName ?? "Soldier",
+            sceneSummary = request.sceneSummary ?? string.Empty,
+            formerIdentity = request.formerIdentity ?? string.Empty,
+            militaryRole = request.militaryRole ?? string.Empty,
+            warTheater = request.warTheater ?? string.Empty,
+            definingTrauma = request.definingTrauma ?? string.Empty,
+            triggerStimulus = request.triggerStimulus ?? string.Empty,
+            identityFracture = request.identityFracture ?? string.Empty,
+            physicalTell = request.physicalTell ?? string.Empty,
+            tabooTopic = request.tabooTopic ?? string.Empty,
+            round = request.round,
+            insanity = request.insanity,
+            insanityStage = request.insanityStage ?? string.Empty,
+            lastPlayerLine = request.lastPlayerLine ?? string.Empty,
+            lastSoldierLine = request.lastSoldierLine ?? string.Empty,
+            recentTranscript = request.recentTranscript ?? Array.Empty<string>(),
+        };
+
+        SendJson(JsonUtility.ToJson(message));
+
+        float timeout = Time.time + requestTimeoutSeconds;
+        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for debate turn...");
+
+        while (Time.time < timeout)
+        {
+            if (responseMap.TryRemove(id, out string line))
+            {
+                TTSResponse response;
+                try { response = JsonUtility.FromJson<TTSResponse>(line); }
+                catch { response = null; }
+
+                if (response == null)
+                {
+                    Debug.LogWarning("[TTS] Invalid debate response line for ID " + id + ": " + line);
+                }
+                else if (response.type == "error")
+                {
+                    Debug.LogError("[TTS ERROR] " + response.error);
+                    callback?.Invoke(null);
+                    yield break;
+                }
+                else if (response.type == "debate_turn_result")
+                {
+                    DebateTurnResultData result = new DebateTurnResultData
+                    {
+                        soldierReply = string.IsNullOrWhiteSpace(response.soldierReply) ? response.replyText : response.soldierReply,
+                        wavPath = response.wavPath ?? string.Empty,
+                        insanityStage = response.insanityStage ?? string.Empty,
+                        breakReason = response.breakReason ?? string.Empty,
+                        temperatureUsed = response.temperatureUsed,
+                        peakInsanity = response.peakInsanity,
+                        debateChoices = response.debateChoices,
+                    };
+
+                    callback?.Invoke(result);
+                    yield break;
+                }
+            }
+
+            DrainQueues();
+            yield return null;
+        }
+
+        Debug.LogError("TTS debate turn generation timeout.");
+        callback?.Invoke(null);
+    }
+
+    public IEnumerator GenerateTypedConversationTurnRoutine(TypedConversationRequestData request, Action<TypedConversationResultData> callback)
+    {
+        if (request == null)
+        {
+            callback?.Invoke(null);
+            yield break;
+        }
+
+        int id = nextId++;
+        TypedConversationMessage message = new TypedConversationMessage
+        {
+            id = id,
+            requestType = "typed_turn",
+            role = string.IsNullOrWhiteSpace(request.role) ? "soldier" : request.role,
+            speakerName = request.speakerName ?? "Speaker",
+            sceneSummary = request.sceneSummary ?? string.Empty,
+            formerIdentity = request.formerIdentity ?? string.Empty,
+            militaryRole = request.militaryRole ?? string.Empty,
+            warTheater = request.warTheater ?? string.Empty,
+            definingTrauma = request.definingTrauma ?? string.Empty,
+            triggerStimulus = request.triggerStimulus ?? string.Empty,
+            identityFracture = request.identityFracture ?? string.Empty,
+            physicalTell = request.physicalTell ?? string.Empty,
+            tabooTopic = request.tabooTopic ?? string.Empty,
+            round = request.round,
+            instability = request.instability,
+            stage = request.stage ?? string.Empty,
+            requiredWord = request.requiredWord ?? string.Empty,
+            playerTypedLine = request.playerTypedLine ?? string.Empty,
+            offeredWords = request.offeredWords ?? Array.Empty<string>(),
+            detectedTags = request.detectedTags ?? Array.Empty<string>(),
+            recentTranscript = request.recentTranscript ?? Array.Empty<string>(),
+        };
+
+        SendJson(JsonUtility.ToJson(message));
+
+        float timeout = Time.time + requestTimeoutSeconds;
+        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for typed turn...");
+
+        while (Time.time < timeout)
+        {
+            if (responseMap.TryRemove(id, out string line))
+            {
+                TTSResponse response;
+                try { response = JsonUtility.FromJson<TTSResponse>(line); }
+                catch { response = null; }
+
+                if (response == null)
+                {
+                    Debug.LogWarning("[TTS] Invalid typed response line for ID " + id + ": " + line);
+                }
+                else if (response.type == "error")
+                {
+                    Debug.LogError("[TTS ERROR] " + response.error);
+                    callback?.Invoke(null);
+                    yield break;
+                }
+                else if (response.type == "typed_turn_result")
+                {
+                    TypedConversationResultData result = new TypedConversationResultData
+                    {
+                        speakerReply = string.IsNullOrWhiteSpace(response.speakerReply) ? response.replyText : response.speakerReply,
+                        wavPath = response.wavPath ?? string.Empty,
+                        stateHint = response.stateHint ?? string.Empty,
+                        backstoryReveal = response.backstoryReveal ?? string.Empty,
+                        suggestedWords = response.suggestedWords ?? Array.Empty<string>(),
+                        temperatureUsed = response.temperatureUsed,
+                        stage = response.stage ?? string.Empty,
+                    };
+
+                    callback?.Invoke(result);
+                    yield break;
+                }
+            }
+
+            DrainQueues();
+            yield return null;
+        }
+
+        Debug.LogError("TTS typed turn generation timeout.");
+        callback?.Invoke(null);
+    }
+
     // -------------------------
     // Helpers
     // -------------------------
@@ -463,7 +654,7 @@ public class TTSRunner : MonoBehaviour
                 try
                 {
                     var response = JsonUtility.FromJson<TTSResponse>(line);
-                    if (response != null && (response.type == "result" || response.type == "choices_result" || response.type == "error"))
+                    if (response != null && (response.type == "result" || response.type == "choices_result" || response.type == "response_result" || response.type == "debate_turn_result" || response.type == "typed_turn_result" || response.type == "error"))
                         responseMap[response.id] = line;
                 }
                 catch { }
@@ -820,8 +1011,69 @@ public class TTSRunner : MonoBehaviour
         public int id;
         public string wavPath;
         public string replyText;
+        public string soldierReply;
+        public string speakerReply;
         public string error;
         public string[] choices;
+        public string insanityStage;
+        public string breakReason;
+        public string stateHint;
+        public string backstoryReveal;
+        public string stage;
+        public float temperatureUsed;
+        public bool peakInsanity;
+        public DebateChoiceData[] debateChoices;
+        public string[] suggestedWords;
+    }
+
+    [Serializable]
+    class DebateTurnMessage
+    {
+        public int id;
+        public string requestType;
+        public string role;
+        public string soldierName;
+        public string sceneSummary;
+        public string formerIdentity;
+        public string militaryRole;
+        public string warTheater;
+        public string definingTrauma;
+        public string triggerStimulus;
+        public string identityFracture;
+        public string physicalTell;
+        public string tabooTopic;
+        public int round;
+        public int insanity;
+        public string insanityStage;
+        public string lastPlayerLine;
+        public string lastSoldierLine;
+        public string[] recentTranscript;
+    }
+
+    [Serializable]
+    class TypedConversationMessage
+    {
+        public int id;
+        public string requestType;
+        public string role;
+        public string speakerName;
+        public string sceneSummary;
+        public string formerIdentity;
+        public string militaryRole;
+        public string warTheater;
+        public string definingTrauma;
+        public string triggerStimulus;
+        public string identityFracture;
+        public string physicalTell;
+        public string tabooTopic;
+        public int round;
+        public int instability;
+        public string stage;
+        public string requiredWord;
+        public string playerTypedLine;
+        public string[] offeredWords;
+        public string[] detectedTags;
+        public string[] recentTranscript;
     }
 }
 

@@ -21,15 +21,18 @@ public class InputManager : MonoBehaviour
         look = GetComponent<PlayerLook>();
 
         // Wrap the actions in a check for the DialogueManager state
-        onFoot.Jump.performed += ctx => {
+        onFoot.Jump.performed += ctx =>
+        {
             DialogueManager dialogueManager = DialogueManager.GetInstance();
             if (dialogueManager == null || !dialogueManager.dialogueIsPlaying) motor.Jump();
         };
-        onFoot.Crouch.performed += ctx => {
+        onFoot.Crouch.performed += ctx =>
+        {
             DialogueManager dialogueManager = DialogueManager.GetInstance();
             if (dialogueManager == null || !dialogueManager.dialogueIsPlaying) motor.Crouch();
         };
-        onFoot.Sprint.performed += ctx => {
+        onFoot.Sprint.performed += ctx =>
+        {
             DialogueManager dialogueManager = DialogueManager.GetInstance();
             if (dialogueManager == null || !dialogueManager.dialogueIsPlaying) motor.Sprint();
         };
@@ -58,11 +61,11 @@ public class InputManager : MonoBehaviour
 
     private void OnEnable()
     {
-            onFoot.Enable();
+        onFoot.Enable();
     }
 
     private void OnDisable()
     {
-            onFoot.Disable();
+        onFoot.Disable();
     }
 }

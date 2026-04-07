@@ -1,0 +1,148 @@
+{
+  "fragments": [
+    {
+      "id": "signal_01",
+      "profileId": "signal_keeper",
+      "memoryType": "battlefield_memory",
+      "emotion": "guilt",
+      "trigger": "static",
+      "bodySensation": "ringing ears",
+      "moralWound": "obedience_over_conscience",
+      "identityTheme": "weapon_instead_of_person",
+      "speechStyle": "clipped_fragmented",
+      "text": "The static rose and I could hear the last call under it again. I kept repeating the coordinates because repeating them felt cleaner than hearing the panic."
+    },
+    {
+      "id": "signal_02",
+      "profileId": "signal_keeper",
+      "memoryType": "trigger_reaction",
+      "emotion": "shame",
+      "trigger": "camera_click",
+      "bodySensation": "jaw locking",
+      "moralWound": "delay_under_fear",
+      "identityTheme": "failed_messenger",
+      "speechStyle": "technical_then_broken",
+      "text": "That click is the same shape as the relay snapping live. My teeth lock before I remember I am in a room and not behind the set."
+    },
+    {
+      "id": "signal_03",
+      "profileId": "signal_keeper",
+      "memoryType": "identity_fragment",
+      "emotion": "numbness",
+      "trigger": "order_language",
+      "bodySensation": "cold hands",
+      "moralWound": "self_erasure",
+      "identityTheme": "relay_not_person",
+      "speechStyle": "flat_confessional",
+      "text": "People thanked the radio after. Not me. The signal. That was easier for everyone."
+    },
+    {
+      "id": "signal_04",
+      "profileId": "signal_keeper",
+      "memoryType": "late_confession",
+      "emotion": "fear",
+      "trigger": "answer_me",
+      "bodySensation": "throat tightening",
+      "moralWound": "withheld_warning",
+      "identityTheme": "cowardice_under_command",
+      "speechStyle": "hesitant_fragment",
+      "text": "I had the warning in my mouth. I waited. I wanted someone above me to say it first."
+    },
+    {
+      "id": "medic_01",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "triage_memory",
+      "emotion": "shame",
+      "trigger": "help_him_first",
+      "bodySensation": "hands scrubbing",
+      "moralWound": "choosing_who_gets_care",
+      "identityTheme": "keeper_of_bodies",
+      "speechStyle": "soft_clinical",
+      "text": "When someone says help him first, I still start sorting people by sound. Loud pain meant breath left. Quiet meant I was already late."
+    },
+    {
+      "id": "medic_02",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "body_memory",
+      "emotion": "dissociation",
+      "trigger": "white_light",
+      "bodySensation": "dry mouth",
+      "moralWound": "numbing_as_survival",
+      "identityTheme": "numbers_over_names",
+      "speechStyle": "detached_to_raw",
+      "text": "The white light makes everyone look prepared for covering. Sheets, tags, pulse, pressure. I hate how fast my head starts counting."
+    },
+    {
+      "id": "medic_03",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "identity_fragment",
+      "emotion": "guilt",
+      "trigger": "save",
+      "bodySensation": "stiff shoulders",
+      "moralWound": "survival_at_scale",
+      "identityTheme": "not_savior",
+      "speechStyle": "quiet_refusal",
+      "text": "Do not say saved. I preserved a few minutes for some and stole them from others by looking away."
+    },
+    {
+      "id": "medic_04",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "late_confession",
+      "emotion": "grief",
+      "trigger": "alive",
+      "bodySensation": "shaking hands",
+      "moralWound": "selected_silence",
+      "identityTheme": "failed_caretaker",
+      "speechStyle": "careful_breaking",
+      "text": "The ones I left are louder than the ones who made it. Maybe because I never had to hear the rest of their story."
+    },
+    {
+      "id": "breacher_01",
+      "profileId": "door_breacher",
+      "memoryType": "urban_memory",
+      "emotion": "hypervigilance",
+      "trigger": "door_slam",
+      "bodySensation": "legs primed to move",
+      "moralWound": "acting_before_thought",
+      "identityTheme": "movement_as_survival",
+      "speechStyle": "fast_sharp",
+      "text": "Door slams and my whole body picks a corner before I do. That is the ugly part. Reflex gets there first."
+    },
+    {
+      "id": "breacher_02",
+      "profileId": "door_breacher",
+      "memoryType": "identity_fragment",
+      "emotion": "self_disgust",
+      "trigger": "clear",
+      "bodySensation": "tight chest",
+      "moralWound": "violence_as_skill",
+      "identityTheme": "good_only_at_breaking",
+      "speechStyle": "mocking_then_raw",
+      "text": "Clear was never clean. It just meant I was moving fast enough that doubt could not grab my ankle."
+    },
+    {
+      "id": "breacher_03",
+      "profileId": "door_breacher",
+      "memoryType": "sensory_flash",
+      "emotion": "panic",
+      "trigger": "flash",
+      "bodySensation": "stomach dropping",
+      "moralWound": "homes_as_targets",
+      "identityTheme": "rooms_not_faces",
+      "speechStyle": "sensory_fragment",
+      "text": "I remember hinges, dust, the frame splintering, the light through the doorway. Faces come back later, if I am unlucky."
+    },
+    {
+      "id": "breacher_04",
+      "profileId": "door_breacher",
+      "memoryType": "late_confession",
+      "emotion": "fear",
+      "trigger": "stop",
+      "bodySensation": "nausea",
+      "moralWound": "speed_over_conscience",
+      "identityTheme": "stillness_equals_memory",
+      "speechStyle": "abrupt_confession",
+      "text": "I moved because stopping meant seeing. Sometimes speed felt kinder than knowing."
+    }
+  ]
+}

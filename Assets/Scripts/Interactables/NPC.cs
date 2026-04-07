@@ -28,6 +28,7 @@ public class NPC : Interactable
     public bool isFollowing = false;
     public bool isCombatActive = false;
     public bool isDead { get; private set; }
+    public bool IsReadyForDialogueInteraction => IsAtDialogueThreshold();
 
     [Header("Combat & Health")]
     public float maxHealth = 100f;
@@ -122,6 +123,11 @@ public class NPC : Interactable
     [SerializeField] private NPCDebateBattle debateBattle;
     public NPCDebateBattle DebateBattle => debateBattle;
 
+    [Header("Optional AI Typed Conversation")]
+    [Tooltip("Optional constrained free-text interaction. If present and enabled, it can start before the debate path.")]
+    [SerializeField] private AITypedConversation typedConversation;
+    [SerializeField] private bool showApproachChoiceWhenBothModesAvailable = true;
+
     [Header("Movement Settings")]
     [SerializeField] private float stoppingDistance = 2.5f;
 
@@ -136,6 +142,7 @@ public class NPC : Interactable
     private Vector3 startPosition;
     private Quaternion startRotation;
     private bool initialCombatState;
+    private bool isApproachChoiceActive;
 
     void Start()
     {
@@ -174,6 +181,11 @@ public class NPC : Interactable
         if (debateBattle == null)
         {
             debateBattle = GetComponent<NPCDebateBattle>();
+        }
+
+        if (typedConversation == null)
+        {
+            typedConversation = GetComponent<AITypedConversation>();
         }
 
         nextWalkFrameTime = Time.time;
@@ -405,15 +417,21 @@ public class NPC : Interactable
     {
         Debug.Log($"NPC.Interact called. isFollowing={isFollowing}, isDead={isDead}, currentHealth={currentHealth}, maxHealth={maxHealth}, healthRatio={(maxHealth > 0f ? currentHealth / maxHealth : 0f)}, threshold={dialogueHealthThreshold}, isCombatActive={isCombatActive}");
 
-        // Optional branch: AI debate battle sequence (room-based / component-based).
-        // This intentionally runs before the following-state early return so the
-        // player can trigger debate again while the NPC is following (zone-gated).
+        if (TryStartApproachChoice())
+        {
+            return;
+        }
+
+        if (typedConversation != null && typedConversation.TryStartTypedConversation())
+        {
+            return;
+        }
+
         if (debateBattle != null && debateBattle.TryStartDebateFromInteract())
         {
             return;
         }
 
-        // Already allied NPC should not re-open normal dialogue/combat.
         if (isFollowing || isDead) return;
 
         if (IsAtDialogueThreshold())
@@ -450,6 +468,91 @@ public class NPC : Interactable
             }
         }
     }
+
+    private bool HasTypedConversationAvailable()
+    {
+        return typedConversation != null && typedConversation.enabled && typedConversation.IsTypedConversationEnabled;
+    }
+
+    private bool HasDebateBattleAvailable()
+    {
+        return debateBattle != null && debateBattle.enabled && debateBattle.IsDebateBattleEnabled;
+    }
+
+    private bool TryStartApproachChoice()
+    {
+        if (!showApproachChoiceWhenBothModesAvailable || isApproachChoiceActive)
+        {
+            return false;
+        }
+
+        if (!HasTypedConversationAvailable() || !HasDebateBattleAvailable())
+        {
+            return false;
+        }
+
+        if (TTSRunner.Instance == null || !TTSRunner.Instance.IsReady)
+        {
+            return false;
+        }
+
+        bool canShowAtThisMoment = isFollowing || IsAtDialogueThreshold();
+        if (!canShowAtThisMoment)
+        {
+            return false;
+        }
+
+        DialogueManager dialogueManager = DialogueManager.GetInstance();
+        if (dialogueManager == null)
+        {
+            return false;
+        }
+
+        if (!dialogueManager.BeginExternalChoiceSession(
+            "Choose your approach.",
+            new[]
+            {
+                "Debate: confront him with guided choices",
+                "Type: build your own sentence"
+            },
+            OnApproachChoiceSelected))
+        {
+            return false;
+        }
+
+        isApproachChoiceActive = true;
+        return true;
+    }
+
+    private void OnApproachChoiceSelected(int choiceIndex)
+    {
+        isApproachChoiceActive = false;
+        StartCoroutine(StartChosenApproachNextFrame(choiceIndex));
+    }
+
+    private IEnumerator StartChosenApproachNextFrame(int choiceIndex)
+    {
+        yield return null;
+
+        if (choiceIndex == 0)
+        {
+            if (debateBattle != null && debateBattle.TryStartDebateFromInteract())
+            {
+                yield break;
+            }
+
+            typedConversation?.TryStartTypedConversation();
+        }
+        else
+        {
+            if (typedConversation != null && typedConversation.TryStartTypedConversation())
+            {
+                yield break;
+            }
+
+            debateBattle?.TryStartDebateFromInteract();
+        }
+    }
     private bool isWaitingForChoice = false;
 
     private IEnumerator PlayIntroThenTTS()
@@ -459,11 +562,6 @@ public class NPC : Interactable
 
         isIntroSequenceRunning = true;
 
-        // 1. PLAY INTRO WAV
-        string wavPath = System.IO.Path.Combine(Application.streamingAssetsPath, introWavRelativePath);
-        yield return PlayLocalWav(wavPath);
-
-        // 2. GENERATE CHOICES
         generatedChoiceOptions = null;
         bool done = false;
 
@@ -479,7 +577,16 @@ public class NPC : Interactable
                 }
             );
         }
+        else
+        {
+            done = true;
+        }
 
+        // 1. PLAY INTRO WAV while the reply options are generating in parallel.
+        string wavPath = System.IO.Path.Combine(Application.streamingAssetsPath, introWavRelativePath);
+        yield return PlayLocalWav(wavPath);
+
+        // 2. Wait only if the options are still not ready yet.
         yield return new WaitUntil(() => done);
 
         // FAILSAFE

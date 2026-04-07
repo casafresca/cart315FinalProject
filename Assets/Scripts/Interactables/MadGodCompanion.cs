@@ -27,6 +27,7 @@ public class MadGodCompanion : Interactable
     private int clipIndex;
     private float nextTalkAllowedTime;
     private Transform playerTransform;
+    [SerializeField] private AITypedConversation typedConversation;
 
     private void Start()
     {
@@ -37,6 +38,11 @@ public class MadGodCompanion : Interactable
             {
                 playerTransform = playerObj.transform;
             }
+        }
+
+        if (typedConversation == null)
+        {
+            typedConversation = GetComponent<AITypedConversation>();
         }
     }
 
@@ -69,6 +75,12 @@ public class MadGodCompanion : Interactable
     {
         if (Time.time < nextTalkAllowedTime)
         {
+            return;
+        }
+
+        if (typedConversation != null && typedConversation.TryStartTypedConversation())
+        {
+            nextTalkAllowedTime = Time.time + Mathf.Max(0.1f, talkCooldownSeconds);
             return;
         }
 
