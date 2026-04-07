@@ -69,11 +69,6 @@ public class PlayerInteract : MonoBehaviour
                 {
                     Debug.Log($"Interact pressed on: {interactable.name}");
                     interactable.BasseInteract();
-
-                    if (TTSRunner.Instance != null)
-                    {
-                        TTSRunner.Instance.TriggerSpeak("Who are you?");
-                    }
                 }
             }
         }

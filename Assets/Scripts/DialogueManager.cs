@@ -13,6 +13,7 @@ public class DialogueManager : MonoBehaviour
 
     [Header("Choices UI")]
     [SerializeField] private GameObject[] choices;
+    [SerializeField] private float externalChoiceVerticalOffset = -70f;
 
     [Header("NPC Logic")]
     private int npcPoints = 0;
@@ -28,9 +29,28 @@ public class DialogueManager : MonoBehaviour
     private Story currentStory;
     private bool externalDialogueSession;
     private Action<int> externalChoiceCallback;
+    private Action<int> externalInlineChoiceCallback;
+    private bool externalChoiceShouldEndSession;
     private bool externalGeneratedChoiceSession;
     private Action<int> externalGeneratedChoiceCallback;
     [SerializeField] private GameObject[] generatedChoiceButtons;
+    private bool externalDialogueTopLayoutActive;
+    private bool cachedDialoguePanelLayout;
+    private Vector2 cachedDialogueAnchorMin;
+    private Vector2 cachedDialogueAnchorMax;
+    private Vector2 cachedDialoguePivot;
+    private Vector2 cachedDialogueAnchoredPosition;
+    private Vector2 cachedDialogueSizeDelta;
+    private float cachedDialogueFontSize;
+    private TextAlignmentOptions cachedDialogueAlignment;
+    private bool cachedDialogueTextLayout;
+    private Vector2 cachedDialogueTextAnchorMin;
+    private Vector2 cachedDialogueTextAnchorMax;
+    private Vector2 cachedDialogueTextPivot;
+    private Vector2 cachedDialogueTextOffsetMin;
+    private Vector2 cachedDialogueTextOffsetMax;
+    private bool cachedChoiceLayout;
+    private Vector2[] cachedChoiceAnchoredPositions;
 
     // This is the variable your Weapon script checks
     public bool dialogueIsPlaying { get; private set; }
@@ -104,6 +124,7 @@ public class DialogueManager : MonoBehaviour
         dialogueIsPlaying = true;
         externalDialogueSession = true;
         externalChoiceCallback = choiceCallback;
+        externalChoiceShouldEndSession = true;
 
         if (dialoguePanel != null) dialoguePanel.SetActive(true);
         if (dialogueText != null) dialogueText.text = prompt ?? string.Empty;
@@ -132,10 +153,151 @@ public class DialogueManager : MonoBehaviour
         return true;
     }
 
+    public bool ShowExternalChoiceOptions(string prompt, string[] optionTexts, Action<int> choiceCallback)
+    {
+        if (!externalDialogueSession)
+        {
+            return false;
+        }
+
+        externalInlineChoiceCallback = choiceCallback;
+        externalChoiceCallback = choiceCallback;
+        externalChoiceShouldEndSession = false;
+
+        if (dialoguePanel != null) dialoguePanel.SetActive(true);
+        if (dialogueText != null) dialogueText.text = prompt ?? string.Empty;
+        if (continueButton != null) continueButton.SetActive(false);
+
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] == null) continue;
+
+                if (optionTexts != null && i < optionTexts.Length)
+                {
+                    choices[i].SetActive(true);
+                    TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
+                    if (txt != null)
+                    {
+                        txt.text = optionTexts[i];
+                        ResizeButtonToFitText(choices[i], txt);
+                    }
+                }
+                else
+                {
+                    choices[i].SetActive(false);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public void HideExternalChoiceOptions()
+    {
+        externalInlineChoiceCallback = null;
+        externalChoiceCallback = null;
+        externalChoiceShouldEndSession = false;
+
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
+    }
+
     public void SetExternalDialogueText(string text)
     {
         if (!externalDialogueSession || dialogueText == null) return;
         dialogueText.text = text ?? string.Empty;
+    }
+
+    public void SetExternalDialogueTopLayout(bool enabled)
+    {
+        if (dialoguePanel == null || dialogueText == null)
+        {
+            return;
+        }
+
+        RectTransform rect = dialoguePanel.GetComponent<RectTransform>();
+        RectTransform textRect = dialogueText.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            return;
+        }
+
+        if (enabled)
+        {
+            if (!cachedDialoguePanelLayout)
+            {
+                cachedDialogueAnchorMin = rect.anchorMin;
+                cachedDialogueAnchorMax = rect.anchorMax;
+                cachedDialoguePivot = rect.pivot;
+                cachedDialogueAnchoredPosition = rect.anchoredPosition;
+                cachedDialogueSizeDelta = rect.sizeDelta;
+                cachedDialogueFontSize = dialogueText.fontSize;
+                cachedDialogueAlignment = dialogueText.alignment;
+                cachedDialoguePanelLayout = true;
+            }
+
+            if (textRect != null && !cachedDialogueTextLayout)
+            {
+                cachedDialogueTextAnchorMin = textRect.anchorMin;
+                cachedDialogueTextAnchorMax = textRect.anchorMax;
+                cachedDialogueTextPivot = textRect.pivot;
+                cachedDialogueTextOffsetMin = textRect.offsetMin;
+                cachedDialogueTextOffsetMax = textRect.offsetMax;
+                cachedDialogueTextLayout = true;
+            }
+
+            rect.anchorMin = new Vector2(0.08f, 1f);
+            rect.anchorMax = new Vector2(0.92f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -28f);
+            rect.sizeDelta = new Vector2(0f, 110f);
+
+            if (textRect != null)
+            {
+                textRect.anchorMin = new Vector2(0f, 0f);
+                textRect.anchorMax = new Vector2(1f, 1f);
+                textRect.pivot = new Vector2(0.5f, 0.5f);
+                textRect.offsetMin = new Vector2(22f, 14f);
+                textRect.offsetMax = new Vector2(-22f, -14f);
+            }
+
+            dialogueText.fontSize = 18f;
+            dialogueText.alignment = TextAlignmentOptions.TopLeft;
+            dialogueText.enableWordWrapping = true;
+            externalDialogueTopLayoutActive = true;
+            return;
+        }
+
+        if (!cachedDialoguePanelLayout)
+        {
+            return;
+        }
+
+        rect.anchorMin = cachedDialogueAnchorMin;
+        rect.anchorMax = cachedDialogueAnchorMax;
+        rect.pivot = cachedDialoguePivot;
+        rect.anchoredPosition = cachedDialogueAnchoredPosition;
+        rect.sizeDelta = cachedDialogueSizeDelta;
+        dialogueText.fontSize = cachedDialogueFontSize;
+        dialogueText.alignment = cachedDialogueAlignment;
+
+        if (textRect != null && cachedDialogueTextLayout)
+        {
+            textRect.anchorMin = cachedDialogueTextAnchorMin;
+            textRect.anchorMax = cachedDialogueTextAnchorMax;
+            textRect.pivot = cachedDialogueTextPivot;
+            textRect.offsetMin = cachedDialogueTextOffsetMin;
+            textRect.offsetMax = cachedDialogueTextOffsetMax;
+        }
+
+        externalDialogueTopLayoutActive = false;
     }
 
     public bool BeginGeneratedChoiceSession(string prompt, string[] optionTexts, Action<int> choiceCallback)
@@ -155,7 +317,28 @@ public class DialogueManager : MonoBehaviour
             for (int i = 0; i < choices.Length; i++)
                 if (choices[i] != null) choices[i].SetActive(false);
 
-        if (generatedChoiceButtons != null && generatedChoiceButtons.Length > 0)
+        if (choices != null && choices.Length > 0)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] == null) continue;
+                if (i < optionTexts.Length)
+                {
+                    choices[i].SetActive(true);
+                    TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
+                    if (txt != null)
+                    {
+                        txt.text = optionTexts[i];
+                        ResizeButtonToFitText(choices[i], txt);
+                    }
+                }
+                else
+                {
+                    choices[i].SetActive(false);
+                }
+            }
+        }
+        else if (generatedChoiceButtons != null && generatedChoiceButtons.Length > 0)
         {
             for (int i = 0; i < generatedChoiceButtons.Length; i++)
             {
@@ -176,30 +359,12 @@ public class DialogueManager : MonoBehaviour
                 }
             }
         }
-        else if (choices != null)
-        {
-            for (int i = 0; i < choices.Length; i++)
-            {
-                if (choices[i] == null) continue;
-                if (i < optionTexts.Length)
-                {
-                    choices[i].SetActive(true);
-                    TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
-                    if (txt != null) 
-                    {
-                        txt.text = optionTexts[i];
-                        ResizeButtonToFitText(choices[i], txt);
-                    }
-                }
-                else
-                {
-                    choices[i].SetActive(false);
-                }
-            }
-        }
 
+        ApplyExternalChoiceOffset();
+        ApplyExternalChoiceOffset();
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+        ApplyExternalChoiceOffset();
         return true;
     }
 
@@ -213,6 +378,13 @@ public class DialogueManager : MonoBehaviour
         externalDialogueSession = false;
         dialogueIsPlaying = false;
         externalChoiceCallback = null;
+        externalInlineChoiceCallback = null;
+        externalChoiceShouldEndSession = false;
+
+        if (externalDialogueTopLayoutActive)
+        {
+            SetExternalDialogueTopLayout(false);
+        }
 
         if (dialoguePanel != null) dialoguePanel.SetActive(false);
         if (dialogueText != null) dialogueText.text = string.Empty;
@@ -253,6 +425,15 @@ public class DialogueManager : MonoBehaviour
             }
         }
 
+        if (choices != null)
+        {
+            for (int i = 0; i < choices.Length; i++)
+            {
+                if (choices[i] != null) choices[i].SetActive(false);
+            }
+        }
+
+        RestoreChoiceLayout();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -311,6 +492,8 @@ public class DialogueManager : MonoBehaviour
         {
             ExitDialogueMode();
         }
+
+        RestoreChoiceLayout();
     }
 
     private void ContinueStory()
@@ -376,6 +559,17 @@ public class DialogueManager : MonoBehaviour
 
     public void MakeChoice(int choiceIndex)
     {
+        if (externalInlineChoiceCallback != null)
+        {
+            Action<int> callback = externalInlineChoiceCallback;
+            externalInlineChoiceCallback = null;
+            externalChoiceCallback = null;
+            externalChoiceShouldEndSession = false;
+            HideExternalChoiceOptions();
+            callback?.Invoke(choiceIndex);
+            return;
+        }
+
         if (externalGeneratedChoiceSession)
         {
             if (externalGeneratedChoiceCallback != null)
@@ -391,10 +585,23 @@ public class DialogueManager : MonoBehaviour
         {
             if (externalChoiceCallback != null)
             {
-                externalChoiceCallback(choiceIndex);
+                Action<int> callback = externalChoiceCallback;
                 externalChoiceCallback = null;
+                bool shouldEndSession = externalChoiceShouldEndSession;
+                externalChoiceShouldEndSession = false;
+                callback(choiceIndex);
+
+                if (shouldEndSession)
+                {
+                    EndExternalDialogueSession();
+                }
+                else
+                {
+                    HideExternalChoiceOptions();
+                }
+                return;
             }
-            EndExternalDialogueSession();
+
             return;
         }
 
@@ -474,6 +681,7 @@ public class DialogueManager : MonoBehaviour
         externalDialogueSession = false;
         externalGeneratedChoiceSession = false;
         externalChoiceCallback = null;
+        externalInlineChoiceCallback = null;
         externalGeneratedChoiceCallback = null;
         if (dialoguePanel != null) dialoguePanel.SetActive(false);
 
@@ -482,6 +690,7 @@ public class DialogueManager : MonoBehaviour
         currentStory = null;
         currentNPC = null;
 
+        RestoreChoiceLayout();
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
@@ -495,15 +704,72 @@ public class DialogueManager : MonoBehaviour
         RectTransform rt = button.GetComponent<RectTransform>();
         if (rt == null) return;
 
-        // Add some padding
+        text.enableWordWrapping = true;
+
         float paddingX = 20f;
-        float paddingY = 10f;
-        float maxWidth = 400f; // Optional max width to prevent too wide buttons
+        float paddingY = 14f;
+        float maxWidth = 280f;
+
+        RectTransform textRect = text.GetComponent<RectTransform>();
+        if (textRect != null)
+        {
+            textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, maxWidth - paddingX);
+        }
 
         float preferredWidth = Mathf.Min(text.preferredWidth + paddingX, maxWidth);
-        float preferredHeight = text.preferredHeight + paddingY;
+        float preferredHeight = Mathf.Max(48f, text.preferredHeight + paddingY);
 
         rt.sizeDelta = new Vector2(preferredWidth, preferredHeight);
+    }
+
+    private void ApplyExternalChoiceOffset()
+    {
+        if (choices == null || choices.Length == 0)
+        {
+            return;
+        }
+
+        if (!cachedChoiceLayout)
+        {
+            cachedChoiceAnchoredPositions = new Vector2[choices.Length];
+            for (int i = 0; i < choices.Length; i++)
+            {
+                RectTransform rect = choices[i] != null ? choices[i].GetComponent<RectTransform>() : null;
+                cachedChoiceAnchoredPositions[i] = rect != null ? rect.anchoredPosition : Vector2.zero;
+            }
+            cachedChoiceLayout = true;
+        }
+
+        for (int i = 0; i < choices.Length; i++)
+        {
+            RectTransform rect = choices[i] != null ? choices[i].GetComponent<RectTransform>() : null;
+            if (rect == null)
+            {
+                continue;
+            }
+
+            Vector2 basePosition = cachedChoiceAnchoredPositions[i];
+            rect.anchoredPosition = new Vector2(basePosition.x, basePosition.y + externalChoiceVerticalOffset);
+        }
+    }
+
+    private void RestoreChoiceLayout()
+    {
+        if (!cachedChoiceLayout || choices == null || cachedChoiceAnchoredPositions == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < choices.Length && i < cachedChoiceAnchoredPositions.Length; i++)
+        {
+            RectTransform rect = choices[i] != null ? choices[i].GetComponent<RectTransform>() : null;
+            if (rect == null)
+            {
+                continue;
+            }
+
+            rect.anchoredPosition = cachedChoiceAnchoredPositions[i];
+        }
     }
 }
 

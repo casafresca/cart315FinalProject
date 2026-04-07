@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Optional AI-vs-AI debate sequence for a soldier NPC.
@@ -27,6 +29,7 @@ public class NPCDebateBattle : MonoBehaviour
 
     [Header("Enable")]
     [SerializeField] private bool enableDebateBattle = true;
+    public bool IsDebateBattleEnabled => enableDebateBattle;
 
     [Header("References")]
     [SerializeField] private NPC npc;
@@ -39,9 +42,11 @@ public class NPCDebateBattle : MonoBehaviour
 
     [Header("Player Turn")]
     [SerializeField] private PlayerTurnMode playerTurnMode = PlayerTurnMode.InteractiveChoices;
-    [Tooltip("How long to wait for key 1/2/3 in InteractiveChoices mode.")]
-    [SerializeField] private float choiceInputTimeoutSeconds = 8f;
-    [Tooltip("If no key is pressed in time, this option index is used (0-based).")]
+    [Tooltip("If enabled, the battle can auto-pick a response after the timeout. Leave this off to keep options on screen until the player clicks.")]
+    [SerializeField] private bool autoPickChoiceOnTimeout = false;
+    [Tooltip("How long to wait before auto-picking when timeout auto-pick is enabled. Set to 0 or less to keep choices on screen until the player clicks.")]
+    [SerializeField] private float choiceInputTimeoutSeconds = 0f;
+    [Tooltip("If a timeout is enabled and no choice is pressed in time, this option index is used (0-based).")]
     [SerializeField] private int defaultChoiceIndex = 0;
     [SerializeField] private DebateChoiceOption[] choiceOptions;
 
@@ -56,14 +61,30 @@ public class NPCDebateBattle : MonoBehaviour
     [SerializeField] private int fastPresetCalmPointDelta = 1;
 
     [Header("Debate Structure")]
-    [SerializeField, Min(1)] private int rounds = 3;
+    [SerializeField, Min(1)] private int rounds = 4;
     [SerializeField, Min(1)] private int calmPointsToWin = 2;
+    [SerializeField, Min(1)] private int manualChoicesRequiredToWin = 3;
     [SerializeField] private float betweenTurnsDelay = 0.3f;
     [SerializeField] private float endTextHoldSeconds = 1.2f;
 
     [Header("Soldier Insanity")]
     [SerializeField, Range(0, 100)] private int soldierInsanityStart = 35;
-    [SerializeField, Range(1, 100)] private int soldierInsanityPerRound = 20;
+    [SerializeField, Range(0, 100)] private int soldierInsanityPerRound = 12;
+    [SerializeField, Range(50, 100)] private int peakInsanityThreshold = 100;
+
+    [Header("Scene Framing")]
+    [SerializeField] private string soldierDisplayName = "Soldier";
+    [TextArea] [SerializeField] private string sceneSummary = "A de-escalation debate with a war-broken soldier whose identity is splintering under PTSD and moral injury.";
+
+    [Header("Soldier Identity")]
+    [SerializeField] private string militaryRole = "Former infantry rifleman";
+    [SerializeField] private string formerIdentity = "He used to be a careful older brother who fixed engines and wrote letters home.";
+    [SerializeField] private string warTheater = "A brutal winter campaign in a fractured border region";
+    [TextArea] [SerializeField] private string definingTrauma = "He survived atrocities, watched civilians and squadmates die, and now cannot separate survival reflex from ordinary life.";
+    [TextArea] [SerializeField] private string triggerStimulus = "A metallic bang, a camera shutter, static, or a sudden order can send him back into combat mode.";
+    [TextArea] [SerializeField] private string identityFracture = "He no longer knows whether he is still a soldier, a survivor, or just a weapon that kept moving.";
+    [TextArea] [SerializeField] private string physicalTell = "He scans corners before speaking, loses track of who he is addressing, and talks like he is hearing the past on top of the present.";
+    [TextArea] [SerializeField] private string tabooTopic = "He cannot bear being called a hero or being told the war made him stronger.";
 
     [Header("Prompt Seeds")]
     [TextArea] [SerializeField] private string openingText = "The air tightens. This will be a battle of words.";
@@ -73,8 +94,11 @@ public class NPCDebateBattle : MonoBehaviour
     [Header("Outcome")]
     [SerializeField] private bool makeSoldierFollowOnWin = true;
     [SerializeField] private bool resumeCombatOnLoss = true;
+    [SerializeField] private bool sendToTherapyRoomOnPeakInsanity = true;
+    [SerializeField] private string rehabilitationSceneName = "therapy room";
     [TextArea] [SerializeField] private string winLine = "The soldier's breathing steadies. He lowers his weapon.";
     [TextArea] [SerializeField] private string lossLine = "The soldier snaps back into survival panic.";
+    [TextArea] [SerializeField] private string peakInsanityLine = "The soldier breaks apart under the pressure. He needs rehabilitation now.";
 
     [Header("Player Lock (Optional)")]
     [SerializeField] private bool lockPlayerScriptsDuringDebate = false;
@@ -137,6 +161,11 @@ public class NPCDebateBattle : MonoBehaviour
             return false;
         }
 
+        if (!isFollowing && !npc.IsReadyForDialogueInteraction)
+        {
+            return false;
+        }
+
         CachePlayerTransform();
 
         if (requiredRoomZone != null && playerTransform != null)
@@ -169,21 +198,40 @@ public class NPCDebateBattle : MonoBehaviour
             yield break;
         }
 
+        dialogueManager.SetExternalDialogueTopLayout(true);
+        dialogueManager.SetExternalDialogueText(
+            $"{openingText}\n\n{soldierDisplayName}\n{militaryRole}\n\nTrigger: {triggerStimulus}");
+
         SetPlayerLocked(true);
         SetSoldierMovementLocked(true);
 
         int calmPoints = 0;
+        int manualChoicesMade = 0;
         int insanity = Mathf.Clamp(soldierInsanityStart, 0, 100);
         string lastPlayerLine = "";
+        string lastSoldierLine = "";
+        List<string> recentTranscript = new List<string>();
+        bool triggeredRehabilitation = false;
 
         for (int round = 1; round <= rounds; round++)
         {
-            string soldierPrompt = BuildSoldierPrompt(round, insanity, lastPlayerLine);
-            string soldierLine = string.Empty;
-            yield return StartCoroutine(RequestLine("soldier", soldierPrompt, soldierFallbackLine, line => soldierLine = line));
+            DebateTurnResultData debateTurn = null;
+            yield return StartCoroutine(RequestDebateTurn(round, insanity, lastPlayerLine, lastSoldierLine, recentTranscript, result => debateTurn = result));
 
-            dialogueManager.SetExternalDialogueText($"Soldier: {soldierLine}\n\nInsanity: {insanity}%");
-            yield return WaitForSecondsRealtimeSafe(betweenTurnsDelay);
+            string soldierLine = debateTurn != null && !string.IsNullOrWhiteSpace(debateTurn.soldierReply)
+                ? debateTurn.soldierReply.Trim()
+                : soldierFallbackLine;
+
+            dialogueManager.SetExternalDialogueText($"Soldier: {soldierLine}\n\nStage: {GetInsanityStage(insanity)}\nInsanity: {insanity}%");
+
+            if (debateTurn != null && TTSRunner.Instance != null && !string.IsNullOrWhiteSpace(debateTurn.wavPath))
+            {
+                yield return StartCoroutine(TTSRunner.Instance.PlayWav(debateTurn.wavPath, "soldier", soldierLine));
+            }
+            else
+            {
+                yield return WaitForSecondsRealtimeSafe(betweenTurnsDelay);
+            }
 
             string playerLine = string.Empty;
             int turnInsanityDelta = 0;
@@ -212,43 +260,78 @@ public class NPCDebateBattle : MonoBehaviour
             }
             else
             {
-                DebateChoiceOption[] options = GetChoiceOptions();
+                DebateChoiceData[] options = GetDynamicChoiceOptions(debateTurn);
                 int chosenIndex = 0;
-                yield return StartCoroutine(ChoosePlayerLine(dialogueManager, soldierLine, insanity, options, idx => chosenIndex = idx));
+                bool wasManualChoice = false;
+                yield return StartCoroutine(ChoosePlayerLine(dialogueManager, soldierLine, insanity, options, (idx, manual) =>
+                {
+                    chosenIndex = idx;
+                    wasManualChoice = manual;
+                }));
 
-                DebateChoiceOption selected = options[Mathf.Clamp(chosenIndex, 0, options.Length - 1)];
-                playerLine = string.IsNullOrWhiteSpace(selected.line) ? playerFallbackLine : selected.line.Trim();
+                DebateChoiceData selected = options[Mathf.Clamp(chosenIndex, 0, options.Length - 1)];
+                playerLine = string.IsNullOrWhiteSpace(selected.text) ? playerFallbackLine : selected.text.Trim();
                 turnInsanityDelta = selected.insanityDelta;
-                turnCalmDelta = selected.calmPointDelta;
+                turnCalmDelta = selected.calmDelta;
+
+                if (wasManualChoice)
+                {
+                    manualChoicesMade++;
+                }
+                else
+                {
+                    turnCalmDelta = Mathf.Min(0, turnCalmDelta);
+                }
             }
 
             calmPoints = Mathf.Max(0, calmPoints + turnCalmDelta);
             insanity = Mathf.Clamp(insanity + soldierInsanityPerRound + turnInsanityDelta, 0, 100);
             lastPlayerLine = playerLine;
+            lastSoldierLine = soldierLine;
+            recentTranscript.Add($"Soldier: {soldierLine}");
+            recentTranscript.Add($"Player: {playerLine}");
+            TrimRecentTranscript(recentTranscript);
 
             dialogueManager.SetExternalDialogueText(
                 $"You: {playerLine}\n\nRound impact: {(turnInsanityDelta >= 0 ? "+" : "")}{turnInsanityDelta} insanity, {(turnCalmDelta >= 0 ? "+" : "")}{turnCalmDelta} calm\n" +
-                $"Insanity now: {insanity}%\nCalm points: {calmPoints}/{calmPointsToWin}");
+                $"Stage now: {GetInsanityStage(insanity)}\nInsanity now: {insanity}%\nCalm points: {calmPoints}/{calmPointsToWin}\nManual choices: {manualChoicesMade}/{manualChoicesRequiredToWin}");
 
             yield return WaitForSecondsRealtimeSafe(betweenTurnsDelay);
+
+            bool reachedPeak = insanity >= peakInsanityThreshold || (debateTurn != null && debateTurn.peakInsanity);
+            if (reachedPeak)
+            {
+                dialogueManager.SetExternalDialogueText(peakInsanityLine);
+                yield return WaitForSecondsRealtimeSafe(endTextHoldSeconds);
+                triggeredRehabilitation = TryEnterRehabilitation();
+                break;
+            }
+
+            if (calmPoints >= calmPointsToWin && manualChoicesMade >= manualChoicesRequiredToWin)
+            {
+                break;
+            }
         }
 
-        bool won = calmPoints >= calmPointsToWin;
-        dialogueManager.SetExternalDialogueText(won ? winLine : lossLine);
-
-        if (npc != null)
+        if (!triggeredRehabilitation)
         {
-            if (won && makeSoldierFollowOnWin)
-            {
-                npc.StartFollowing();
-            }
-            else if (!won && resumeCombatOnLoss)
-            {
-                npc.ResumeCombat();
-            }
-        }
+            bool won = calmPoints >= calmPointsToWin && manualChoicesMade >= manualChoicesRequiredToWin;
+            dialogueManager.SetExternalDialogueText(won ? winLine : lossLine);
 
-        yield return WaitForSecondsRealtimeSafe(endTextHoldSeconds);
+            if (npc != null)
+            {
+                if (won && makeSoldierFollowOnWin)
+                {
+                    npc.StartFollowing();
+                }
+                else if (!won && resumeCombatOnLoss)
+                {
+                    npc.ResumeCombat();
+                }
+            }
+
+            yield return WaitForSecondsRealtimeSafe(endTextHoldSeconds);
+        }
 
         dialogueManager.EndExternalDialogueSession();
         SetPlayerLocked(false);
@@ -256,34 +339,55 @@ public class NPCDebateBattle : MonoBehaviour
         isRunning = false;
     }
 
-    private IEnumerator ChoosePlayerLine(DialogueManager dialogueManager, string soldierLine, int insanity, DebateChoiceOption[] options, Action<int> onChoice)
+    private IEnumerator ChoosePlayerLine(DialogueManager dialogueManager, string soldierLine, int insanity, DebateChoiceData[] options, Action<int, bool> onChoice)
     {
         int safeDefault = Mathf.Clamp(defaultChoiceIndex, 0, options.Length - 1);
-
-        dialogueManager.SetExternalDialogueText(
-            $"Soldier: {soldierLine}\n\nInsanity: {insanity}%\n\n" +
-            $"Choose response: [1] {options[0].title}\n" +
-            $"[2] {options[1].title}\n" +
-            $"[3] {options[2].title}\n\n" +
-            $"(Auto-picks {safeDefault + 1} in {choiceInputTimeoutSeconds:0.#}s)");
-
-        float endTime = Time.realtimeSinceStartup + Mathf.Max(1f, choiceInputTimeoutSeconds);
         int selected = -1;
+        bool callbackReceived = false;
+        bool manualChoice = false;
 
-        while (Time.realtimeSinceStartup < endTime)
+        string[] optionTexts = new string[options.Length];
+        for (int i = 0; i < options.Length; i++)
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) { selected = 0; break; }
-            if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) { selected = 1; break; }
-            if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) { selected = 2; break; }
-            yield return null;
+            string title = string.IsNullOrWhiteSpace(options[i].title) ? "Response" : options[i].title.Trim();
+            string text = string.IsNullOrWhiteSpace(options[i].text) ? string.Empty : options[i].text.Trim();
+            optionTexts[i] = string.IsNullOrWhiteSpace(text) ? title : $"{title}: {text}";
         }
 
-        if (selected < 0)
+        dialogueManager.ShowExternalChoiceOptions(
+            $"Soldier: {soldierLine}\n\nStage: {GetInsanityStage(insanity)}\nInsanity: {insanity}%\nChoose your response:",
+            optionTexts,
+            idx =>
+            {
+                selected = idx;
+                callbackReceived = true;
+                manualChoice = true;
+            });
+
+        bool useTimeout = autoPickChoiceOnTimeout && choiceInputTimeoutSeconds > 0f;
+        if (!useTimeout)
         {
-            selected = safeDefault;
+            while (!callbackReceived)
+            {
+                yield return null;
+            }
+        }
+        else
+        {
+            float endTime = Time.realtimeSinceStartup + Mathf.Max(1f, choiceInputTimeoutSeconds);
+            while (Time.realtimeSinceStartup < endTime && !callbackReceived)
+            {
+                yield return null;
+            }
+
+            if (!callbackReceived)
+            {
+                selected = safeDefault;
+                dialogueManager.HideExternalChoiceOptions();
+            }
         }
 
-        onChoice?.Invoke(selected);
+        onChoice?.Invoke(selected, manualChoice);
     }
 
     private DebateChoiceOption[] GetChoiceOptions()
@@ -299,6 +403,30 @@ public class NPCDebateBattle : MonoBehaviour
             new DebateChoiceOption { title = "Question him", line = "If you keep firing, what are you protecting right now?", insanityDelta = 4, calmPointDelta = 0 },
             new DebateChoiceOption { title = "Provoke him", line = "Then prove you are still in control.", insanityDelta = 18, calmPointDelta = -1 },
         };
+    }
+
+    private DebateChoiceData[] GetDynamicChoiceOptions(DebateTurnResultData debateTurn)
+    {
+        if (debateTurn != null && debateTurn.debateChoices != null && debateTurn.debateChoices.Length >= 3)
+        {
+            return debateTurn.debateChoices;
+        }
+
+        DebateChoiceOption[] fallback = GetChoiceOptions();
+        DebateChoiceData[] converted = new DebateChoiceData[fallback.Length];
+        for (int i = 0; i < fallback.Length; i++)
+        {
+            converted[i] = new DebateChoiceData
+            {
+                title = fallback[i].title,
+                text = fallback[i].line,
+                tone = "fallback",
+                insanityDelta = fallback[i].insanityDelta,
+                calmDelta = fallback[i].calmPointDelta,
+            };
+        }
+
+        return converted;
     }
 
     private string GetFastPresetLine()
@@ -336,6 +464,53 @@ public class NPCDebateBattle : MonoBehaviour
     private string BuildPlayerPrompt(int round, int insanity, string soldierLine)
     {
         return $"Debate round {round}. You are the player trying to de-escalate the soldier. Soldier just said: '{soldierLine}'. His PTSD pressure is {insanity}/100. Reply with one concise line that grounds, validates, and redirects him away from violence.";
+    }
+
+    private IEnumerator RequestDebateTurn(int round, int insanity, string lastPlayerLine, string lastSoldierLine, List<string> recentTranscript, Action<DebateTurnResultData> onResult)
+    {
+        TTSRunner runner = TTSRunner.Instance;
+        if (runner == null)
+        {
+            onResult?.Invoke(null);
+            yield break;
+        }
+
+        DebateTurnRequestData request = new DebateTurnRequestData
+        {
+            role = "soldier",
+            soldierName = string.IsNullOrWhiteSpace(soldierDisplayName) ? "Soldier" : soldierDisplayName.Trim(),
+            sceneSummary = sceneSummary ?? string.Empty,
+            formerIdentity = formerIdentity ?? string.Empty,
+            militaryRole = militaryRole ?? string.Empty,
+            warTheater = warTheater ?? string.Empty,
+            definingTrauma = definingTrauma ?? string.Empty,
+            triggerStimulus = triggerStimulus ?? string.Empty,
+            identityFracture = identityFracture ?? string.Empty,
+            physicalTell = physicalTell ?? string.Empty,
+            tabooTopic = tabooTopic ?? string.Empty,
+            round = round,
+            insanity = insanity,
+            insanityStage = GetInsanityStage(insanity),
+            lastPlayerLine = lastPlayerLine ?? string.Empty,
+            lastSoldierLine = lastSoldierLine ?? string.Empty,
+            recentTranscript = recentTranscript != null ? recentTranscript.ToArray() : Array.Empty<string>(),
+        };
+
+        bool done = false;
+        DebateTurnResultData result = null;
+        runner.GenerateDebateTurn(request, response =>
+        {
+            result = response;
+            done = true;
+        });
+
+        float timeoutAt = Time.realtimeSinceStartup + Mathf.Max(2f, aiReplyTimeoutSeconds);
+        while (!done && Time.realtimeSinceStartup < timeoutAt)
+        {
+            yield return null;
+        }
+
+        onResult?.Invoke(result);
     }
 
     private IEnumerator RequestLine(string role, string prompt, string fallback, Action<string> onResult)
@@ -385,6 +560,48 @@ public class NPCDebateBattle : MonoBehaviour
             || t.Contains("here")
             || t.Contains("steady")
             || t.Contains("ground");
+    }
+
+    private string GetInsanityStage(int insanity)
+    {
+        if (insanity >= 85) return "breaking";
+        if (insanity >= 65) return "delusional";
+        if (insanity >= 40) return "unstable";
+        if (insanity >= 20) return "frayed";
+        return "guarded";
+    }
+
+    private void TrimRecentTranscript(List<string> recentTranscript)
+    {
+        if (recentTranscript == null)
+        {
+            return;
+        }
+
+        while (recentTranscript.Count > 8)
+        {
+            recentTranscript.RemoveAt(0);
+        }
+    }
+
+    private bool TryEnterRehabilitation()
+    {
+        if (!sendToTherapyRoomOnPeakInsanity || string.IsNullOrWhiteSpace(rehabilitationSceneName))
+        {
+            return false;
+        }
+
+        CachePlayerTransform();
+        if (playerTransform != null)
+        {
+            TherapySessionState.SetReturnPoint(
+                SceneManager.GetActiveScene().name,
+                playerTransform.position,
+                playerTransform.rotation);
+        }
+
+        SceneManager.LoadScene(rehabilitationSceneName);
+        return true;
     }
 
     private IEnumerator WaitForSecondsRealtimeSafe(float seconds)
