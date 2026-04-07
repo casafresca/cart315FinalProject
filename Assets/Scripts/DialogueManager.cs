@@ -134,25 +134,14 @@ public class DialogueManager : MonoBehaviour
 
     public void SetExternalDialogueText(string text)
     {
-        if (!externalDialogueSession || dialogueText == null)
-        {
-            return;
-        }
-
+        if (!externalDialogueSession || dialogueText == null) return;
         dialogueText.text = text ?? string.Empty;
     }
 
     public bool BeginGeneratedChoiceSession(string prompt, string[] optionTexts, Action<int> choiceCallback)
     {
-        if (dialogueIsPlaying)
-        {
-            return false;
-        }
-
-        if (optionTexts == null)
-        {
-            optionTexts = new string[0];
-        }
+        if (dialogueIsPlaying) return false;
+        if (optionTexts == null) optionTexts = new string[0];
 
         dialogueIsPlaying = true;
         externalGeneratedChoiceSession = true;
@@ -163,12 +152,8 @@ public class DialogueManager : MonoBehaviour
         if (continueButton != null) continueButton.SetActive(false);
 
         if (choices != null)
-        {
             for (int i = 0; i < choices.Length; i++)
-            {
                 if (choices[i] != null) choices[i].SetActive(false);
-            }
-        }
 
         if (generatedChoiceButtons != null && generatedChoiceButtons.Length > 0)
         {
@@ -483,7 +468,7 @@ public class DialogueManager : MonoBehaviour
         }
     }
 
-    private void ExitDialogueMode()
+    public void ExitDialogueMode()
     {
         dialogueIsPlaying = false;
         externalDialogueSession = false;

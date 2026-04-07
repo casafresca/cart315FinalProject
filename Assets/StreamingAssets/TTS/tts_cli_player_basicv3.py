@@ -482,8 +482,21 @@ def main():
                 log(f"Choices sent for request {request_id}")
                 continue
 
+            if request_type == "response":
+                reply_text = generate_reply(role=role, user_text=user_text)
+                log(f"Generated response: {reply_text}")
+                response = {
+                    "type": "response_result",
+                    "id": request_id,
+                    "replyText": reply_text,
+                    "elapsedMs": 0,
+                }
+                print(json.dumps(response), flush=True)
+                log(f"Response sent for request {request_id}")
+                continue
+
+            # Default: "speak" - generate reply and TTS
             reply_text = generate_reply(role=role, user_text=user_text)
-            log(f"Generated reply: {reply_text}")
             start_time = time.perf_counter()
 
             role_speaker_wavs = resolve_role_speaker_wavs(role)

@@ -150,6 +150,19 @@ public class TTSRunner : MonoBehaviour
         }
     }
 
+    public void GenerateResponse(string prompt, Action<string> callback)
+    {
+        if (!isReady)
+        {
+            Debug.LogWarning("[TTS] Not ready yet!");
+            callback?.Invoke(null);
+        }
+        else
+        {
+            StartCoroutine(GenerateResponseRoutine(prompt, callback));
+        }
+    }
+
     void Update()
     {
         DrainQueues();
@@ -372,6 +385,51 @@ public class TTSRunner : MonoBehaviour
         }
 
         Debug.LogError("TTS choice generation timeout.");
+        callback?.Invoke(null);
+    }
+
+    public IEnumerator GenerateResponseRoutine(string prompt, Action<string> callback)
+    {
+        int id = nextId++;
+        string json = $"{{\"id\":{id},\"requestType\":\"response\",\"role\":\"soldier\",\"text\":\"{Escape(prompt)}\"}}";
+
+        Debug.Log($"[TTS] Sending response generation request: {prompt}");
+        SendJson(json);
+
+        float timeout = Time.time + requestTimeoutSeconds;
+        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for response...");
+
+        while (Time.time < timeout)
+        {
+            if (responseMap.TryRemove(id, out string line))
+            {
+                TTSResponse response;
+                try { response = JsonUtility.FromJson<TTSResponse>(line); }
+                catch { response = null; }
+
+                if (response == null)
+                {
+                    Debug.LogWarning("[TTS] Invalid response line for ID " + id + ": " + line);
+                }
+                else if (response.type == "error")
+                {
+                    Debug.LogError("[TTS ERROR] " + response.error);
+                    callback?.Invoke(null);
+                    yield break;
+                }
+                else if (response.type == "response_result")
+                {
+                    Debug.Log("[TTS] Response received.");
+                    callback?.Invoke(response.replyText);
+                    yield break;
+                }
+            }
+
+            DrainQueues();
+            yield return null;
+        }
+
+        Debug.LogError("TTS response generation timeout.");
         callback?.Invoke(null);
     }
 

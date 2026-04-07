@@ -52,14 +52,7 @@ public class PlayerMotor : MonoBehaviour
             crouchTimer += Time.deltaTime;
             float p = crouchTimer / 1;
             p *= p;
-            if (crouching)
-            {
-                controller.height = Mathf.Lerp(controller.height, 1, p);
-            }
-            else
-            {
-                controller.height = Mathf.Lerp(controller.height, 2, p);
-            }
+            controller.height = Mathf.Lerp(controller.height, crouching ? 1 : 2, p);
 
             if (p > 1)
             {
@@ -81,15 +74,9 @@ public class PlayerMotor : MonoBehaviour
         {
             fallTimer += Time.deltaTime;
 
-            if (fallTimer >= maxFallDuration)
-            {
-                RespawnAtSpawnPoint();
-            }
+            if (fallTimer >= maxFallDuration) RespawnAtSpawnPoint();
         }
-        else
-        {
-            fallTimer = 0f;
-        }
+        else fallTimer = 0f;
     }
 
     private void RespawnAtSpawnPoint()
@@ -102,25 +89,19 @@ public class PlayerMotor : MonoBehaviour
     }
 
     public void ProcessMove(Vector2 input)
-        {
-            Vector3 moveDirection = Vector3.zero;
-            moveDirection.x = input.x;
-            moveDirection.z = input.y;
-            controller.Move(transform.TransformDirection(moveDirection) * speed * Time.deltaTime);
-            playerVelocity.y += gravity * Time.deltaTime;
-            if(isGrounded && playerVelocity.y < 0)
-            {
-                playerVelocity.y = -2f;
-            }
-            controller.Move(playerVelocity * Time.deltaTime);
+    {
+        Vector3 moveDirection = Vector3.zero;
+        moveDirection.x = input.x;
+        moveDirection.z = input.y;
+        controller.Move(transform.TransformDirection(moveDirection) * speed * Time.deltaTime);
+        playerVelocity.y += gravity * Time.deltaTime;
+        if(isGrounded && playerVelocity.y < 0) playerVelocity.y = -2f;
+        controller.Move(playerVelocity * Time.deltaTime);
     }
 
     public void Jump()
     {
-        if(isGrounded)
-        {
-            playerVelocity.y = Mathf.Sqrt(jumpHeight * -3f * gravity);
-        }
+        if(isGrounded) playerVelocity.y = Mathf.Sqrt(jumpHeight * -3f * gravity);
     }
 
     public void Crouch()
@@ -129,16 +110,9 @@ public class PlayerMotor : MonoBehaviour
         crouchTimer = 0;
         lerpCrouch = true;
     }
-     public void Sprint()
+    public void Sprint()
     {
         sprinting = !sprinting;
-        if (sprinting)
-        {
-            speed = 10f;
-        }
-        else
-        {
-            speed = 5f;
-        }
+        speed = sprinting ? 10f : 5f;
     }
 }

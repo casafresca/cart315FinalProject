@@ -22,7 +22,7 @@ OLLAMA_EXE: str = _env("OLLAMA_EXE", str(REPO_ROOT / "ollama" / "ollama.exe"))
 OLLAMA_TIMEOUT_SECONDS: float = float(_env("OLLAMA_TIMEOUT_SECONDS", "60"))
 OLLAMA_PREP_TIMEOUT_SECONDS: float = float(_env("OLLAMA_PREP_TIMEOUT_SECONDS", "900"))
 # New: skip costly pull by default at startup
-OLLAMA_AUTO_PULL: bool = _env("OLLAMA_AUTO_PULL", "false").lower() in {"1", "true", "yes", "y"}
+OLLAMA_AUTO_PULL: bool = _env("OLLAMA_AUTO_PULL", "true").lower() in {"1", "true", "yes", "y"}
 
 # Voice reference files (XTTS voice cloning)
 VOICE_DIR: Path = Path(_env("VOICE_DIR", str(REPO_ROOT / "tortoise")))

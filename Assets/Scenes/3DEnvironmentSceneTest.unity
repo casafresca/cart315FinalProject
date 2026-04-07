@@ -1936,7 +1936,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -137, y: 15}
+  m_AnchoredPosition: {x: -330, y: 200}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1001 &85694101
@@ -4138,6 +4138,7 @@ MonoBehaviour:
   audioSource: {fileID: 1493541544}
   successSound: {fileID: 8300000, guid: d0873366b68f1f54cbde96910e2ad89f, type: 3}
   failureSound: {fileID: 8300000, guid: e4de91db11fe9c147b4c3335cae5c855, type: 3}
+  generatedChoiceButtons: []
 --- !u!4 &195826564
 Transform:
   m_ObjectHideFlags: 0
@@ -10971,7 +10972,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 118, y: -47}
+  m_AnchoredPosition: {x: 330, y: -47}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1001 &469514072
@@ -30145,6 +30146,9 @@ MonoBehaviour:
   becomeHostileWhenShot: 1
   dialogueHealthThreshold: 0.3
   preventDeathBeforeDialogue: 1
+  introWavRelativePath: TTS/wavs/soldier1.wav
+  introLineText: Who are you?
+  useGeneratedReplyOptions: 1
   spriteRenderer: {fileID: 0}
   idleSprite: {fileID: 21300000, guid: e48be5ff34250e84a90721c5004aad53, type: 3}
   attackSprite: {fileID: 21300000, guid: 6568190b79931bb41936fd7b4836b9d6, type: 3}
@@ -44671,7 +44675,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 115, y: 12}
+  m_AnchoredPosition: {x: 330, y: 200}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1941046536
@@ -46334,7 +46338,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -138, y: -42}
+  m_AnchoredPosition: {x: -330, y: -42}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1998905697
