@@ -450,6 +450,7 @@ public class NPC : Interactable
             }
         }
     }
+    private bool isWaitingForChoice = false;
 
     private IEnumerator PlayIntroThenTTS()
     {
@@ -457,77 +458,67 @@ public class NPC : Interactable
             yield break;
 
         isIntroSequenceRunning = true;
-        choiceOptionsReady = false;
-        generatedChoiceOptions = null;
 
-        if (useGeneratedReplyOptions && TTSRunner.Instance != null)
+        // 1. PLAY INTRO WAV
+        string wavPath = System.IO.Path.Combine(Application.streamingAssetsPath, introWavRelativePath);
+        yield return PlayLocalWav(wavPath);
+
+        // 2. GENERATE CHOICES
+        generatedChoiceOptions = null;
+        bool done = false;
+
+        if (TTSRunner.Instance != null)
         {
             TTSRunner.Instance.GenerateChoiceOptions(
-                $"The soldier said: \"{introLineText}\". Generate four short player reply options in this exact order: showing military respect, insulting his service, offering to listen, and ordering him to stand down.",
+                $"The soldier said: \"{introLineText}\". Generate four short player reply options.",
                 options =>
                 {
                     generatedChoiceOptions = options;
-                    choiceOptionsReady = true;
+                    done = true;
+                    Debug.Log("CHOICES GENERATED");
                 }
             );
         }
 
-        string wavPath = System.IO.Path.Combine(Application.streamingAssetsPath, introWavRelativePath);
-        yield return PlayLocalWav(wavPath);
+        yield return new WaitUntil(() => done);
 
-        float waitUntil = Time.time + 5f;
-        while (!choiceOptionsReady && Time.time < waitUntil)
-            yield return null;
+        // FAILSAFE
+        if (generatedChoiceOptions == null || generatedChoiceOptions.Length == 0)
+        {
+            Debug.LogError("NO CHOICES GENERATED");
+            isIntroSequenceRunning = false;
+            yield break;
+        }
 
-        DialogueManager dialogueManager = DialogueManager.GetInstance();
-        if (dialogueManager != null)
-        {
-            if (choiceOptionsReady && generatedChoiceOptions != null && generatedChoiceOptions.Length > 0)
-            {
-                Debug.Log("NPC: Starting external choice session after intro.");
-                dialogueManager.BeginGeneratedChoiceSession(
-                    "How do you respond to him?",
-                    generatedChoiceOptions,
-                    OnPlayerChoiceSelected
-                );
-            }
-            else if (inkJSON != null)
-            {
-                Debug.Log("NPC: Falling back to Ink dialogue after intro.");
-                dialogueManager.EnterDialogueMode(inkJSON, this);
-            }
-            else
-            {
-                Debug.LogWarning("NPC: No choices available and no inkJSON fallback.");
-                isCombatActive = true;
-                if (npcGun != null) npcGun.SetActive(true);
-                UpdateVisualState();
-            }
-        }
-        else
-        {
-            Debug.LogWarning("NPC: DialogueManager instance was not found.");
-            isCombatActive = true;
-            if (npcGun != null) npcGun.SetActive(true);
-            UpdateVisualState();
-        }
+        // 3. SHOW CHOICES
+        isWaitingForChoice = true;
+
+        DialogueManager.GetInstance().BeginGeneratedChoiceSession(
+            "How do you respond?",
+            generatedChoiceOptions,
+            OnPlayerChoiceSelected
+        );
+
+        Debug.Log("WAITING FOR PLAYER CHOICE");
+
+        // 4. WAIT FOR CLICK
+        yield return new WaitUntil(() => isWaitingForChoice == false);
+
+        Debug.Log("PLAYER CHOSE SOMETHING");
 
         isIntroSequenceRunning = false;
     }
-
     private void OnPlayerChoiceSelected(int choiceIndex)
     {
-        if (generatedChoiceOptions == null || choiceIndex < 0 || choiceIndex >= generatedChoiceOptions.Length)
-        {
-            Debug.LogWarning("NPC: Invalid player choice index.");
-            isCombatActive = true;
-            if (npcGun != null) npcGun.SetActive(true);
-            UpdateVisualState();
-            return;
-        }
+        if (generatedChoiceOptions == null) return;
 
-        string selectedChoice = generatedChoiceOptions[choiceIndex];
-        StartCoroutine(PlayResponseAfterChoice(selectedChoice));
+        string selected = generatedChoiceOptions[choiceIndex];
+
+        Debug.Log("CHOICE CLICKED: " + selected);
+
+        isWaitingForChoice = false; // 🔥 THIS UNLOCKS THE COROUTINE
+
+        StartCoroutine(PlayResponseAfterChoice(selected));
     }
 
     private IEnumerator PlayResponseAfterChoice(string selectedChoice)
@@ -748,4 +739,3 @@ public class NPC : Interactable
         public string[] choices;
     }
 }
-
