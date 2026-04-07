@@ -19,7 +19,11 @@ public class PlayerInteract : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        cam = GetComponent<PlayerLook>().cam;
+        PlayerLook playerLook = GetComponent<PlayerLook>();
+        if (playerLook != null)
+        {
+            cam = playerLook.cam;
+        }
         playerUI = GetComponent<PlayerUI>();
         inputManager = GetComponent<InputManager>();
     }
@@ -27,6 +31,29 @@ public class PlayerInteract : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (cam == null)
+        {
+            PlayerLook playerLook = GetComponent<PlayerLook>();
+            if (playerLook != null)
+            {
+                cam = playerLook.cam;
+            }
+
+            if (cam == null)
+            {
+                return;
+            }
+        }
+
+        if (playerUI == null)
+        {
+            playerUI = GetComponent<PlayerUI>();
+            if (playerUI == null)
+            {
+                return;
+            }
+        }
+
         // 1. If dialogue is playing, clear the UI and stop looking for interactables
         DialogueManager dialogueManager = DialogueManager.GetInstance();
         if (dialogueManager != null && dialogueManager.dialogueIsPlaying)
