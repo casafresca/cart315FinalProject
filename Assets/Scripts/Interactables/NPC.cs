@@ -642,7 +642,7 @@ public class NPC : Interactable
 
         // 2. MODIFY SANITY BASED ON PLAYER INPUT
         float delta = EvaluateChoiceImpact(selectedChoice);
-        sanity += delta;
+        sanity += delta * 4f; // Scale impact for more noticeable changes
 
         Debug.Log($"SANITY CHANGED: {sanity} (delta: {delta})");
 
