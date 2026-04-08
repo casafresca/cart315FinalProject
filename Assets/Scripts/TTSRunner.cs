@@ -124,8 +124,8 @@ public class TTSRunner : MonoBehaviour
             pythonExe = bundledPython;
         }
 
-        Debug.Log($"[TTS] Root: {ttsRoot}");
-        Debug.Log($"[TTS] Script: {scriptPath}");
+        // Debug.Log($"[TTS] Root: {ttsRoot}");
+        // Debug.Log($"[TTS] Script: {scriptPath}");
 
         EnsureSubtitleUi();
         StartPython();
@@ -211,7 +211,7 @@ public class TTSRunner : MonoBehaviour
     // -------------------------
     void StartPython()
     {
-        Debug.Log("[TTS] Launching Python process...");
+        // Debug.Log("[TTS] Launching Python process...");
 
         if (!File.Exists(scriptPath)) return;
 
@@ -692,7 +692,7 @@ public class TTSRunner : MonoBehaviour
 
     public IEnumerator PlayWav(string path, string role, string replyText)
     {
-        Debug.Log("[TTS] Loading WAV: " + path);
+        // Debug.Log("[TTS] Loading WAV: " + path);
 
         if (!File.Exists(path))
         {
@@ -722,18 +722,18 @@ public class TTSRunner : MonoBehaviour
             yield break;
         }
 
-        Debug.Log($"[TTS] Clip loaded: {clip.length}s");
+        // Debug.Log($"[TTS] Clip loaded: {clip.length}s");
 
         audioSource.clip = clip;
         ShowSubtitle(role, replyText, clip.length);
         audioSource.Play();
 
-        Debug.Log("[TTS] Playing audio...");
+        // Debug.Log("[TTS] Playing audio...");
 
         while (audioSource.isPlaying)
             yield return null;
 
-        Debug.Log("[TTS] Playback finished");
+        // Debug.Log("[TTS] Playback finished");
         ClearSubtitle();
 
         try

@@ -104,6 +104,7 @@ public class NPC : Interactable
     private float followingTintBlend;
     private bool isHitFlickerActive;
     private float sanity = 0.5f;
+    [SerializeField] private float sanityStep = 0.13f;
 
     [Header("Always Ghost (Optional)")]
     [Tooltip("If true, the NPC keeps a ghostly look all the time.")]
@@ -144,6 +145,7 @@ public class NPC : Interactable
     private Quaternion startRotation;
     private bool initialCombatState;
     private bool isApproachChoiceActive;
+
 
     void Start()
     {
@@ -499,15 +501,11 @@ public class NPC : Interactable
 
         bool canShowAtThisMoment = isFollowing || IsAtDialogueThreshold();
         if (!canShowAtThisMoment)
-        {
             return false;
-        }
 
         DialogueManager dialogueManager = DialogueManager.GetInstance();
         if (dialogueManager == null)
-        {
             return false;
-        }
 
         if (!dialogueManager.BeginExternalChoiceSession(
             "Choose your approach.",
@@ -599,6 +597,7 @@ public class NPC : Interactable
         }
 
         // 3. SHOW CHOICES
+        
         isWaitingForChoice = true;
 
         DialogueManager.GetInstance().BeginGeneratedChoiceSession(
@@ -607,14 +606,30 @@ public class NPC : Interactable
             OnPlayerChoiceSelected
         );
 
-        Debug.Log("WAITING FOR PLAYER CHOICE");
+        // Debug.Log("WAITING FOR PLAYER CHOICE");
 
         // 4. WAIT FOR CLICK
         yield return new WaitUntil(() => isWaitingForChoice == false);
 
-        Debug.Log("PLAYER CHOSE SOMETHING");
+        // Debug.Log("PLAYER CHOSE SOMETHING");
 
         isIntroSequenceRunning = false;
+    }
+
+    public void ApplyChoiceEffect(int choiceType)
+    {
+        switch (choiceType)
+        {
+            case 0:
+            case 2:
+                sanity += sanityStep;
+                break;
+            case 1:
+            case 3:
+                sanity -= sanityStep;
+                break;
+        }
+        sanity = Mathf.Clamp01(sanity);
     }
     private void OnPlayerChoiceSelected(int choiceIndex)
     {
@@ -622,7 +637,7 @@ public class NPC : Interactable
 
         string selected = generatedChoiceOptions[choiceIndex];
 
-        Debug.Log("CHOICE CLICKED: " + selected);
+        // Debug.Log("CHOICE CLICKED: " + selected);
 
         isWaitingForChoice = false; // 🔥 THIS UNLOCKS THE COROUTINE
 
@@ -642,7 +657,9 @@ public class NPC : Interactable
 
         // 2. MODIFY SANITY BASED ON PLAYER INPUT
         float delta = EvaluateChoiceImpact(selectedChoice);
+        delta *= 8f; // Scale up the raw impact to make choices more meaningful
         sanity += delta;
+        sanity = Mathf.Clamp01(sanity);
 
         Debug.Log($"SANITY CHANGED: {sanity} (delta: {delta})");
 
@@ -673,7 +690,7 @@ public class NPC : Interactable
         if (TTSRunner.Instance != null)
         {
             TTSRunner.Instance.GenerateChoiceOptions(
-                $"The conversation continues. The player said: \"{selectedChoice}\". Generate four new reply options.",
+                $"The conversation continues. The player said: \"{selectedChoice}\". Generate four new reply options. KEEP IT UNDER 30 CHARACTERS. FINISH YOUR SENTENCES IN FULL, GRAMMATICAL FORM.",
                 options =>
                 {
                     generatedChoiceOptions = options;

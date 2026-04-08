@@ -160,7 +160,7 @@ def load_soldier_prompt_data(script_dir: str) -> None:
             if soldier_name:
                 soldier_profiles_by_name[normalize_lookup_key(soldier_name)] = profile
 
-        log(f"Loaded soldier profiles: {len(soldier_profiles_by_id)}")
+        #log(f"Loaded soldier profiles: {len(soldier_profiles_by_id)}")
     except FileNotFoundError:
         log(f"Soldier profile file not found: {profiles_path}")
     except Exception as exc:
@@ -178,7 +178,7 @@ def load_soldier_prompt_data(script_dir: str) -> None:
                 continue
             soldier_fragments_by_profile[profile_id].append(fragment)
 
-        log(f"Loaded soldier testimony fragments: {sum(len(v) for v in soldier_fragments_by_profile.values())}")
+        # log(f"Loaded soldier testimony fragments: {sum(len(v) for v in soldier_fragments_by_profile.values())}")
     except FileNotFoundError:
         log(f"Soldier testimony fragment file not found: {fragments_path}")
     except Exception as exc:
@@ -352,7 +352,7 @@ def run_ollama_with_options(prompt: str, *, temperature: float | None = None, fo
 
 
 def ensure_ollama_model() -> None:
-    log(f"Preparing Ollama model: {LLM_MODEL}")
+    #log(f"Preparing Ollama model: {LLM_MODEL}")
     cmd = [OLLAMA_EXE, "pull", LLM_MODEL]
     try:
         result = subprocess.run(
@@ -386,13 +386,13 @@ def generate_reply(*, role: str, user_text: str) -> str:
     global rag_engine
 
     if rag_engine is not None and getattr(rag_engine, "enabled", False) and getattr(rag_engine, "vectorizer", None) is None:
-        log("[RAG] Lazy init on first request...")
+        #log("[RAG] Lazy init on first request...")
         rag_engine.initialize()
 
     memory_context = ""
     if rag_engine is not None:
         memory_context = rag_engine.build_prompt_context(user_text)
-        log(f"RAG memory context:\n{memory_context}")
+        #log(f"RAG memory context:\n{memory_context}")
 
     role_prompt = ROLE_SYSTEM_PROMPTS.get(role, ROLE_SYSTEM_PROMPTS[DEFAULT_ROLE])
     role_style = ROLE_STYLE_GUIDES.get(role, "")
@@ -505,7 +505,7 @@ def generate_choice_options(*, role: str, user_text: str) -> list[str]:
     )
 
     raw = run_ollama(prompt)
-    log(f"Raw choice generation output: {raw}")
+    #log(f"Raw choice generation output: {raw}")
 
     # Parse as plain text lines
     lines = [line.strip() for line in raw.replace('\r', '\n').split('\n') if line.strip() and not line.lower().startswith(('here', 'the options', '1.', '2.', '3.', '4.')) and len(line) > 5]
@@ -726,7 +726,7 @@ def generate_debate_turn(*, role: str, payload: dict) -> dict:
     global rag_engine
 
     if rag_engine is not None and getattr(rag_engine, "enabled", False) and getattr(rag_engine, "vectorizer", None) is None:
-        log("[RAG] Lazy init on first request...")
+        #log("[RAG] Lazy init on first request...")
         rag_engine.initialize()
 
     profile = resolve_soldier_profile(payload)
@@ -822,7 +822,7 @@ def generate_debate_turn(*, role: str, payload: dict) -> dict:
     )
 
     raw = run_ollama_with_options(prompt, temperature=temperature, force_json=True)
-    log(f"Raw debate output: {raw}")
+    #log(f"Raw debate output: {raw}")
 
     payload_json = None
     parse_status = "ok"
@@ -1140,7 +1140,7 @@ def clean_choice(choice: str) -> str:
 def initialize():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     log(f"Torch: {torch.__version__}, CUDA: {torch.cuda.is_available()}, Device: {device}")
-    log(f"Loading model: {MODEL_NAME}")
+    #log(f"Loading model: {MODEL_NAME}")
     start = time.perf_counter()
     tts = TTS(MODEL_NAME).to(device)
     load_time = time.perf_counter() - start
@@ -1174,7 +1174,7 @@ def main():
 
     os.makedirs(out_dir, exist_ok=True)
     out_dir = os.path.abspath(out_dir)
-    log(f"Output directory: {out_dir}")
+    # log(f"Output directory: {out_dir}")
 
     load_mad_god_lore(script_dir)
     load_soldier_prompt_data(script_dir)
@@ -1214,7 +1214,7 @@ def main():
         if not line:
             continue
 
-        log(f"Received line: {line}")
+        #log(f"Received line: {line}")
 
         try:
             msg = json.loads(line)
@@ -1262,7 +1262,7 @@ def main():
 
             if request_type == "response":
                 reply_text = generate_reply(role=role, user_text=user_text)
-                log(f"Generated response: {reply_text}")
+                #log(f"Generated response: {reply_text}")
                 response = {
                     "type": "response_result",
                     "id": request_id,
@@ -1270,7 +1270,7 @@ def main():
                     "elapsedMs": 0,
                 }
                 print(json.dumps(response), flush=True)
-                log(f"Response sent for request {request_id}")
+                #log(f"Response sent for request {request_id}")
                 continue
 
             if request_type == "debate_turn":
@@ -1315,7 +1315,7 @@ def main():
                     "elapsedMs": elapsed_ms,
                 }
                 print(json.dumps(response), flush=True)
-                log(f"Debate turn sent for request {request_id}")
+                #log(f"Debate turn sent for request {request_id}")
                 continue
 
             if request_type == "typed_turn":
@@ -1388,7 +1388,7 @@ def main():
 
             out_path = os.path.abspath(os.path.join(out_dir, f"tts_{request_id}_{int(time.time() * 1000)}.wav"))
             sf.write(out_path, wav_np, sample_rate)
-            log(f"Wrote WAV file: {out_path} ({os.path.getsize(out_path)} bytes)")
+            #log(f"Wrote WAV file: {out_path} ({os.path.getsize(out_path)} bytes)")
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
             response = {
