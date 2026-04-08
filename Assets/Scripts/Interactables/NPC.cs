@@ -103,6 +103,7 @@ public class NPC : Interactable
 
     private float followingTintBlend;
     private bool isHitFlickerActive;
+    private float sanity = 0.5f;
 
     [Header("Always Ghost (Optional)")]
     [Tooltip("If true, the NPC keeps a ghostly look all the time.")]
@@ -630,6 +631,7 @@ public class NPC : Interactable
 
     private IEnumerator PlayResponseAfterChoice(string selectedChoice)
     {
+        // 1. GET NPC RESPONSE
         string prompt = $"The soldier said: \"{introLineText}\". The player replied: \"{selectedChoice}\". Respond as the soldier with a short, in-character line.";
 
         if (TTSRunner.Instance != null)
@@ -638,11 +640,82 @@ public class NPC : Interactable
             yield return new WaitUntil(() => TTSRunner.Instance != null && !TTSRunner.Instance.IsSpeaking);
         }
 
-        isCombatActive = true;
-        if (npcGun != null) npcGun.SetActive(true);
-        UpdateVisualState();
-    }
+        // 2. MODIFY SANITY BASED ON PLAYER INPUT
+        float delta = EvaluateChoiceImpact(selectedChoice);
+        sanity += delta;
 
+        Debug.Log($"SANITY CHANGED: {sanity} (delta: {delta})");
+
+        // 3. CHECK END CONDITIONS
+        if (sanity <= 0f)
+        {
+            Debug.Log("NPC LOST. Reset required.");
+            isIntroSequenceRunning = false;
+            yield break;
+        }
+
+        if (sanity >= 1f)
+        {
+            Debug.Log("NPC SNAPPED. ENTERING COMBAT.");
+
+            isCombatActive = true;
+            if (npcGun != null) npcGun.SetActive(true);
+            UpdateVisualState();
+
+            isIntroSequenceRunning = false;
+            yield break;
+        }
+
+        // 4. LOOP BACK → GENERATE NEW CHOICES
+        generatedChoiceOptions = null;
+        bool done = false;
+
+        if (TTSRunner.Instance != null)
+        {
+            TTSRunner.Instance.GenerateChoiceOptions(
+                $"The conversation continues. The player said: \"{selectedChoice}\". Generate four new reply options.",
+                options =>
+                {
+                    generatedChoiceOptions = options;
+                    done = true;
+                }
+            );
+        }
+        else done = true;
+
+        yield return new WaitUntil(() => done);
+
+        if (generatedChoiceOptions == null || generatedChoiceOptions.Length == 0)
+        {
+            Debug.LogError("FAILED TO GENERATE NEXT CHOICES");
+            isIntroSequenceRunning = false;
+            yield break;
+        }
+
+        // 5. SHOW NEXT CHOICES (LOOP CONTINUES)
+        isWaitingForChoice = true;
+
+        DialogueManager.GetInstance().BeginGeneratedChoiceSession(
+            "What do you say next?",
+            generatedChoiceOptions,
+            OnPlayerChoiceSelected
+        );
+
+        yield return new WaitUntil(() => isWaitingForChoice == false);
+    }
+    private float EvaluateChoiceImpact(string choice)
+    {
+        choice = choice.ToLower();
+
+        // crude but effective — you can upgrade this later with AI scoring
+        if (choice.Contains("help") || choice.Contains("understand") || choice.Contains("why"))
+            return +0.15f;
+
+        if (choice.Contains("kill") || choice.Contains("hate") || choice.Contains("shut up"))
+            return -0.2f;
+
+        return Random.Range(-0.05f, 0.05f); // chaos factor
+    }
     private IEnumerator PlayLocalWav(string path)
     {
         if (!File.Exists(path))
