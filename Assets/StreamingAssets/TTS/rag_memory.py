@@ -75,7 +75,7 @@ class PDFMemoryRAG:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             loaded = self._try_load_cache()
             if loaded:
-                self.log(f"[RAG] Loaded cache with {len(self.chunks)} chunks.")
+                #self.log(f"[RAG] Loaded cache with {len(self.chunks)} chunks.")
                 return
 
             self._build_index()

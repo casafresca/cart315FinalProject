@@ -325,7 +325,7 @@ public class TTSRunner : MonoBehaviour
         SendJson(json);
 
         float timeout = Time.time + requestTimeoutSeconds;
-        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for Python response...");
+        // Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for Python response...");
 
         while (Time.time < timeout)
         {
@@ -379,7 +379,7 @@ public class TTSRunner : MonoBehaviour
         SendJson(json);
 
         float timeout = Time.time + requestTimeoutSeconds;
-        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for choice response...");
+        // Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for choice response...");
 
         while (Time.time < timeout)
         {
@@ -424,7 +424,7 @@ public class TTSRunner : MonoBehaviour
         SendJson(json);
 
         float timeout = Time.time + requestTimeoutSeconds;
-        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for response...");
+        // Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for response...");
 
         while (Time.time < timeout)
         {
@@ -495,7 +495,7 @@ public class TTSRunner : MonoBehaviour
         SendJson(JsonUtility.ToJson(message));
 
         float timeout = Time.time + requestTimeoutSeconds;
-        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for debate turn...");
+        // Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for debate turn...");
 
         while (Time.time < timeout)
         {
@@ -578,7 +578,7 @@ public class TTSRunner : MonoBehaviour
         SendJson(JsonUtility.ToJson(message));
 
         float timeout = Time.time + requestTimeoutSeconds;
-        Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for typed turn...");
+        // Debug.Log($"[TTS] Waiting up to {requestTimeoutSeconds} seconds for typed turn...");
 
         while (Time.time < timeout)
         {
@@ -741,7 +741,7 @@ public class TTSRunner : MonoBehaviour
             if (File.Exists(path))
             {
                 File.Delete(path);
-                Debug.Log("[TTS] Deleted temp WAV: " + path);
+                // Debug.Log("[TTS] Deleted temp WAV: " + path);
             }
         }
         catch (Exception ex)
