@@ -82,6 +82,11 @@ public class DialogueBox_TR : MonoBehaviour
         ConfigureQuestionButtons();
         HideQuestionOptions();
 
+        if (therapyRoomController != null)
+        {
+            therapyRoomController.LockPlayerMovement();
+        }
+
         textComponent.text = string.Empty;
         StartDialogue();
     }
@@ -245,10 +250,15 @@ public class DialogueBox_TR : MonoBehaviour
             return;
         }
 
-        dialogueState = DialogueState.QuestionTyping;
-
         DialogueQuestion question = questions[currentQuestionIndex];
         Debug.Log("DialogueBox_TR: showing question " + (currentQuestionIndex + 1));
+
+        BeginJournalQuestion(question);
+    }
+
+    private void BeginJournalQuestion(DialogueQuestion question)
+    {
+        dialogueState = DialogueState.QuestionTyping;
 
         if (therapyRoomController != null)
         {
