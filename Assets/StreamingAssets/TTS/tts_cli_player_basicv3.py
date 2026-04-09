@@ -1257,7 +1257,7 @@ def main():
                     "elapsedMs": elapsed_ms,
                 }
                 print(json.dumps(response), flush=True)
-                log(f"Choices sent for request {request_id}")
+                #log(f"Choices sent for request {request_id}")
                 continue
 
             if request_type == "response":
@@ -1370,7 +1370,7 @@ def main():
                     "elapsedMs": elapsed_ms,
                 }
                 print(json.dumps(response), flush=True)
-                log(f"Typed turn sent for request {request_id}")
+                # log(f"Typed turn sent for request {request_id}")
                 continue
 
             # Default: "speak" - generate reply and TTS

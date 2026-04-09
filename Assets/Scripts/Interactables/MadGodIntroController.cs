@@ -148,7 +148,7 @@ public class MadGodIntroController : MonoBehaviour
             TryAutoLoadIntroClips();
         }
 
-        if ((subtitleLines == null || subtitleLines.Length == 0))
+        if (subtitleLines == null || subtitleLines.Length == 0)
         {
             subtitleLines = LoadSubtitleLinesFromTranscript();
         }
@@ -335,7 +335,14 @@ public class MadGodIntroController : MonoBehaviour
 
         if (Input.GetKeyDown(skipIntroKey))
         {
-            skipRequested = true;
+            bool ttsReady = TTSRunner.Instance != null && TTSRunner.Instance.IsReady;
+
+            if (allowSkipIntro && ttsReady)
+            {
+                skipRequested = true;
+                Debug.Log("MadGodIntroController: Skip requested. Playing skip response line.");
+            }
+            else Debug.Log("Skip requested but TTSRunner not ready. Skip ignored.");
         }
 
         return skipRequested;

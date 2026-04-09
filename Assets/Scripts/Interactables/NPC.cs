@@ -572,7 +572,7 @@ public class NPC : Interactable
                 {
                     generatedChoiceOptions = options;
                     done = true;
-                    Debug.Log("CHOICES GENERATED");
+                    // Debug.Log("CHOICES GENERATED");
                 }
             );
         }
@@ -668,6 +668,7 @@ public class NPC : Interactable
         {
             Debug.Log("NPC LOST. Reset required.");
             isIntroSequenceRunning = false;
+            sanity = 0.5f; // Reset sanity for next time without needing a full NPC reset
             yield break;
         }
 
@@ -680,6 +681,7 @@ public class NPC : Interactable
             UpdateVisualState();
 
             isIntroSequenceRunning = false;
+            sanity = 0.5f; // Reset sanity for next time without needing a full NPC reset
             yield break;
         }
 
