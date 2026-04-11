@@ -4,6 +4,7 @@ using UnityEngine;
 using Ink.Runtime;
 using UnityEngine.AI;
 using UnityEngine.Networking;
+using TMPro;
 
 /// <summary>
 /// Main enemy/ally brain for the soldier NPC.
@@ -194,6 +195,14 @@ public class NPC : Interactable
         nextWalkFrameTime = Time.time;
         UpdateVisualState();
         UpdateColorEffects();
+
+        if (sanityText == null)
+        {
+            GameObject obj = GameObject.Find("SanityText");
+            if (obj != null)
+                sanityText = obj.GetComponent<TMPro.TextMeshProUGUI>();
+        }
+        sanityText.gameObject.SetActive(false);
     }
 
     // --- NEW: Stop listening if destroyed ---
@@ -556,6 +565,7 @@ public class NPC : Interactable
 
     private IEnumerator PlayIntroThenTTS()
     {
+        sanityText.gameObject.SetActive(true);
         if (isIntroSequenceRunning)
             yield break;
 
@@ -567,10 +577,10 @@ public class NPC : Interactable
         if (TTSRunner.Instance != null)
         {
             TTSRunner.Instance.GenerateChoiceOptions(
-                $"The soldier said: \"{introLineText}\". Generate four short player reply options.",
+                $"The soldier said: \"{introLineText}\". Generate four new reply options, SAY TWO SENTENCES MAX. DO NOT EXCEED 20 CHARACTERS. FINISH YOUR SENTENCES IN FULL, GRAMMATICAL FORM.",
                 options =>
                 {
-                    generatedChoiceOptions = options;
+                    generatedChoiceOptions = ColorizeChoices(options);
                     done = true;
                     // Debug.Log("CHOICES GENERATED");
                 }
@@ -597,7 +607,7 @@ public class NPC : Interactable
         }
 
         // 3. SHOW CHOICES
-        
+
         isWaitingForChoice = true;
 
         DialogueManager.GetInstance().BeginGeneratedChoiceSession(
@@ -641,7 +651,24 @@ public class NPC : Interactable
 
         isWaitingForChoice = false; // 🔥 THIS UNLOCKS THE COROUTINE
 
+        conversationTurnCount++;
+
+
         StartCoroutine(PlayResponseAfterChoice(selected));
+    }
+    private string[] ColorizeChoices(string[] choices)
+    {
+        string[] result = new string[choices.Length];
+
+        for (int i = 0; i < choices.Length; i++)
+        {
+            float score = EvaluateChoiceImpactNew(choices[i]);
+            string color = GetColorTag(score);
+
+            result[i] = $"<color={color}>{choices[i]}</color>";
+        }
+
+        return result;
     }
 
     private IEnumerator PlayResponseAfterChoice(string selectedChoice)
@@ -656,16 +683,19 @@ public class NPC : Interactable
         }
 
         // 2. MODIFY SANITY BASED ON PLAYER INPUT
-        float delta = EvaluateChoiceImpact(selectedChoice);
+        float delta = EvaluateChoiceImpactNew(selectedChoice);
         delta *= 8f; // Scale up the raw impact to make choices more meaningful
         sanity += delta;
         sanity = Mathf.Clamp01(sanity);
+
+        UpdateSanityUI();
 
         Debug.Log($"SANITY CHANGED: {sanity} (delta: {delta})");
 
         // 3. CHECK END CONDITIONS
         if (sanity <= 0f)
         {
+            sanityText.gameObject.SetActive(false);
             Debug.Log("NPC LOST. Reset required.");
             isIntroSequenceRunning = false;
             sanity = 0.5f; // Reset sanity for next time without needing a full NPC reset
@@ -674,6 +704,7 @@ public class NPC : Interactable
 
         if (sanity >= 1f)
         {
+            sanityText.gameObject.SetActive(false);
             Debug.Log("NPC SNAPPED. ENTERING COMBAT.");
 
             isCombatActive = true;
@@ -685,6 +716,20 @@ public class NPC : Interactable
             yield break;
         }
 
+
+        if (conversationTurnCount >= maxTurnsBeforeCombat)
+        {
+            sanityText.gameObject.SetActive(false);
+            Debug.Log("MAX TURNS REACHED. ENTERING COMBAT.");
+            isCombatActive = true;
+            if (npcGun != null) npcGun.SetActive(true);
+            UpdateVisualState();
+            isIntroSequenceRunning = false;
+            conversationTurnCount = 0;
+            sanity = 0.5f;
+            yield break;
+        }
+
         // 4. LOOP BACK → GENERATE NEW CHOICES
         generatedChoiceOptions = null;
         bool done = false;
@@ -692,10 +737,10 @@ public class NPC : Interactable
         if (TTSRunner.Instance != null)
         {
             TTSRunner.Instance.GenerateChoiceOptions(
-                $"The conversation continues. The player said: \"{selectedChoice}\". Generate four new reply options. KEEP IT UNDER 30 CHARACTERS. FINISH YOUR SENTENCES IN FULL, GRAMMATICAL FORM.",
+                $"The conversation continues. The player said: \"{selectedChoice}\". Generate four new reply options, SAY TWO SENTENCES MAX. DO NOT EXCEED 20 CHARACTERS. FINISH YOUR SENTENCES IN FULL, GRAMMATICAL FORM.",
                 options =>
                 {
-                    generatedChoiceOptions = options;
+                    generatedChoiceOptions = ColorizeChoices(options);
                     done = true;
                 }
             );
@@ -714,6 +759,7 @@ public class NPC : Interactable
         // 5. SHOW NEXT CHOICES (LOOP CONTINUES)
         isWaitingForChoice = true;
 
+
         DialogueManager.GetInstance().BeginGeneratedChoiceSession(
             "What do you say next?",
             generatedChoiceOptions,
@@ -722,6 +768,49 @@ public class NPC : Interactable
 
         yield return new WaitUntil(() => isWaitingForChoice == false);
     }
+    [SerializeField] private TextMeshProUGUI sanityText;
+    private void UpdateSanityUI()
+    {
+        if (sanityText == null) return;
+
+        sanityText.text = $"Sanity: {(int)(sanity * 100)}%";
+
+        // Optional color feedback
+        Color color = Color.Lerp(Color.red, Color.green, sanity);
+        sanityText.color = color;
+    }
+    private float EvaluateChoiceImpactNew(string choice)
+    {
+        return EvaluateChoiceImpact(choice);
+        choice = choice.ToLower();
+        float score = 0f;
+
+        // Positive intent signals
+        if (choice.Contains("i can")) score += 0.1f;
+        if (choice.Contains("let me")) score += 0.1f;
+        if (choice.Contains("we")) score += 0.1f;
+        if (choice.Contains("?")) score += 0.05f; // curiosity
+
+        // Negative intent signals
+        if (choice.Contains("you")) score -= 0.05f; // accusatory tone
+        if (choice.Contains("!")) score -= 0.05f;
+        if (choice.Contains("now")) score -= 0.05f;
+
+        // Your original keywords (keep them as strong signals)
+        if (choice.Contains("help") || choice.Contains("understand") || choice.Contains("why"))
+            score += 0.3f;
+
+        if (choice.Contains("kill") || choice.Contains("hate") || choice.Contains("shut up"))
+            score -= 0.4f;
+
+        if (score == 0f)
+        {
+            score = Random.Range(-0.2f, 0.2f);
+        }
+        return score;
+    }
+    private int conversationTurnCount = 0;
+    [SerializeField] private int maxTurnsBeforeCombat = 3;
     private float EvaluateChoiceImpact(string choice)
     {
         choice = choice.ToLower();
@@ -734,6 +823,16 @@ public class NPC : Interactable
             return -0.2f;
 
         return Random.Range(-0.05f, 0.05f); // chaos factor
+    }
+    private string GetColorTag(float score)
+    {
+        if (score > 0.1f)
+            return "#006400";
+
+        if (score < -0.1f)
+            return "#FF0000";
+
+        return "black"; // neutral
     }
     private IEnumerator PlayLocalWav(string path)
     {

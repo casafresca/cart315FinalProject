@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 using Ink.Runtime;
 using System.Collections.Generic;
@@ -347,7 +348,7 @@ public class DialogueManager : MonoBehaviour
                 {
                     generatedChoiceButtons[i].SetActive(true);
                     TextMeshProUGUI txt = generatedChoiceButtons[i].GetComponentInChildren<TextMeshProUGUI>();
-                    if (txt != null) 
+                    if (txt != null)
                     {
                         txt.text = optionTexts[i];
                         ResizeButtonToFitText(generatedChoiceButtons[i], txt);
@@ -544,7 +545,7 @@ public class DialogueManager : MonoBehaviour
             {
                 choices[i].gameObject.SetActive(true);
                 TextMeshProUGUI txt = choices[i].GetComponentInChildren<TextMeshProUGUI>();
-                if (txt != null) 
+                if (txt != null)
                 {
                     txt.text = currentChoices[i].text;
                     ResizeButtonToFitText(choices[i], txt);
@@ -697,6 +698,7 @@ public class DialogueManager : MonoBehaviour
         Debug.Log("Dialogue Mode Exited. Shooting should be re-enabled.");
     }
 
+
     private void ResizeButtonToFitText(GameObject button, TextMeshProUGUI text)
     {
         if (button == null || text == null) return;
@@ -708,18 +710,29 @@ public class DialogueManager : MonoBehaviour
 
         float paddingX = 20f;
         float paddingY = 14f;
-        float maxWidth = 280f;
+        float maxWidth = 1000f;
 
         RectTransform textRect = text.GetComponent<RectTransform>();
+
+        text.ForceMeshUpdate();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(textRect);
+
+        // Clamp width but allow wrapping
+        float width = Mathf.Min(text.preferredWidth + paddingX, maxWidth);
+
         if (textRect != null)
         {
-            textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, maxWidth - paddingX);
+            textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width - paddingX);
         }
 
-        float preferredWidth = Mathf.Min(text.preferredWidth + paddingX, maxWidth);
-        float preferredHeight = Mathf.Max(48f, text.preferredHeight + paddingY);
+        // Force update again after width change
+        text.ForceMeshUpdate();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(textRect);
 
-        rt.sizeDelta = new Vector2(preferredWidth, preferredHeight);
+        float height = text.preferredHeight + paddingY;
+
+        // Apply final size
+        rt.sizeDelta = new Vector2(width, Mathf.Max(48f, height));
     }
 
     private void ApplyExternalChoiceOffset()
