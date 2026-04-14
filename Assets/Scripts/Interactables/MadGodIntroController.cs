@@ -343,6 +343,7 @@ public class MadGodIntroController : MonoBehaviour
                 Debug.Log("MadGodIntroController: Skip requested. Playing skip response line.");
             }
             else Debug.Log("Skip requested but TTSRunner not ready. Skip ignored.");
+            skipRequested = true; // REMOVE THIS WHEN WE PRESENT!!
         }
 
         return skipRequested;

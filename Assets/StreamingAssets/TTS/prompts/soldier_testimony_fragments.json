@@ -49,6 +49,54 @@
       "text": "I had the warning in my mouth. I waited. I wanted someone above me to say it first."
     },
     {
+      "id": "signal_05",
+      "profileId": "signal_keeper",
+      "memoryType": "early_deflection",
+      "emotion": "defensiveness",
+      "trigger": "name",
+      "bodySensation": "shoulders locking",
+      "moralWound": "hiding_inside_role",
+      "identityTheme": "rank_over_self",
+      "speechStyle": "clipped_technical",
+      "text": "A name does not matter if the message got through. Names are for letters, not for signals."
+    },
+    {
+      "id": "signal_06",
+      "profileId": "signal_keeper",
+      "memoryType": "sensory_flash",
+      "emotion": "panic",
+      "trigger": "speaker_crackle",
+      "bodySensation": "skin going cold",
+      "moralWound": "hearing_panic_without_action",
+      "identityTheme": "voice_as_weapon",
+      "speechStyle": "breathless_repeat",
+      "text": "When the speaker cracks, I can smell hot dust and wet wool again. The voice on the line always sounds close enough to save until it suddenly doesn't."
+    },
+    {
+      "id": "signal_07",
+      "profileId": "signal_keeper",
+      "memoryType": "mid_reveal",
+      "emotion": "grief",
+      "trigger": "answer",
+      "bodySensation": "tongue feeling heavy",
+      "moralWound": "unanswered_call",
+      "identityTheme": "failed_witness",
+      "speechStyle": "quiet_looping",
+      "text": "He kept saying answer, answer, answer like the word itself could hold the room together. I still hear the gap where I should have filled it."
+    },
+    {
+      "id": "signal_08",
+      "profileId": "signal_keeper",
+      "memoryType": "late_identity_break",
+      "emotion": "self_loathing",
+      "trigger": "dependable",
+      "bodySensation": "jaw trembling",
+      "moralWound": "calm_as_complicity",
+      "identityTheme": "machine_mask",
+      "speechStyle": "flat_then_cracked",
+      "text": "They liked that I sounded calm. Calm meant useful. Calm meant the dying men on the other end got my clean voice instead of my fear."
+    },
+    {
       "id": "medic_01",
       "profileId": "keeper_of_bodies",
       "memoryType": "triage_memory",
@@ -97,6 +145,54 @@
       "text": "The ones I left are louder than the ones who made it. Maybe because I never had to hear the rest of their story."
     },
     {
+      "id": "medic_05",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "early_deflection",
+      "emotion": "restraint",
+      "trigger": "saved",
+      "bodySensation": "hands clasping hard",
+      "moralWound": "rejecting_praise",
+      "identityTheme": "not_a_savior",
+      "speechStyle": "gentle_refusal",
+      "text": "Please do not make me larger than the room I failed in. Saving is a word people use when they do not want the numbers."
+    },
+    {
+      "id": "medic_06",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "sensory_flash",
+      "emotion": "dread",
+      "trigger": "wet_cloth",
+      "bodySensation": "stomach tightening",
+      "moralWound": "comfort_without_cure",
+      "identityTheme": "care_as_delay",
+      "speechStyle": "soft_sensory",
+      "text": "Wet cloth on skin and I am back under those lamps, wiping dust out of a face I already knew I could not keep here. The cloth was for me as much as for them."
+    },
+    {
+      "id": "medic_07",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "mid_reveal",
+      "emotion": "guilt",
+      "trigger": "breathe",
+      "bodySensation": "breath catching",
+      "moralWound": "measuring_survival_by_sound",
+      "identityTheme": "listening_for_the_end",
+      "speechStyle": "careful_confession",
+      "text": "I started listening to breaths the way other people listen to clocks. Fast, shallow, wet, fading. Once you hear enough of them, you begin to know which one is leaving."
+    },
+    {
+      "id": "medic_08",
+      "profileId": "keeper_of_bodies",
+      "memoryType": "late_identity_break",
+      "emotion": "shame",
+      "trigger": "hands",
+      "bodySensation": "fingers curling inward",
+      "moralWound": "clean_hands_falsehood",
+      "identityTheme": "caretaker_split",
+      "speechStyle": "quiet_then_clinical",
+      "text": "These hands learned two jobs: hold someone still and move on. I think what broke me was how often I did the second one faster."
+    },
+    {
       "id": "breacher_01",
       "profileId": "door_breacher",
       "memoryType": "urban_memory",
@@ -143,6 +239,54 @@
       "identityTheme": "stillness_equals_memory",
       "speechStyle": "abrupt_confession",
       "text": "I moved because stopping meant seeing. Sometimes speed felt kinder than knowing."
+    },
+    {
+      "id": "breacher_05",
+      "profileId": "door_breacher",
+      "memoryType": "early_deflection",
+      "emotion": "hostility",
+      "trigger": "brave",
+      "bodySensation": "chin lifting",
+      "moralWound": "praise_as_erasure",
+      "identityTheme": "weaponized_reputation",
+      "speechStyle": "mocking_bark",
+      "text": "Brave is what people say when they want the door opened and do not want to know what it costs the one who goes first."
+    },
+    {
+      "id": "breacher_06",
+      "profileId": "door_breacher",
+      "memoryType": "sensory_flash",
+      "emotion": "terror",
+      "trigger": "heavy_footsteps",
+      "bodySensation": "knees spring-loading",
+      "moralWound": "body_outpacing_thought",
+      "identityTheme": "reflex_over_self",
+      "speechStyle": "fast_fragmented",
+      "text": "Heavy steps in a narrow place and my body starts the count before I do. Distance, corner, frame, breath, move. It is ugly how little of me that requires."
+    },
+    {
+      "id": "breacher_07",
+      "profileId": "door_breacher",
+      "memoryType": "mid_reveal",
+      "emotion": "grief",
+      "trigger": "safe",
+      "bodySensation": "throat going dry",
+      "moralWound": "home_becoming_target",
+      "identityTheme": "ruined_shelter",
+      "speechStyle": "raw_sensory",
+      "text": "Do not say safe like rooms mean that anymore. I remember wallpaper, toys, kitchens, shoes by the door. Places meant to hold people started teaching me angles instead."
+    },
+    {
+      "id": "breacher_08",
+      "profileId": "door_breacher",
+      "memoryType": "late_identity_break",
+      "emotion": "self_disgust",
+      "trigger": "stop",
+      "bodySensation": "nausea rising",
+      "moralWound": "speed_as_escape",
+      "identityTheme": "motion_addiction",
+      "speechStyle": "abrupt_self_indictment",
+      "text": "You want the truth? Sometimes the running felt good because thinking felt worse. That is the part that made me hard to recognize."
     }
   ]
 }
